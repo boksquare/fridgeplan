@@ -1,0 +1,13 @@
+node_modules/
+.next/
+out/
+build/
+.env
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+/uploads
+
+# Prisma generates its client as source; regenerate with `npx prisma generate`.
+src/generated/

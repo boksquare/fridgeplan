@@ -1,0 +1,36 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://fridgeplan:${POSTGRES_PASSWORD:-fridgeplan}@db:5432/fridgeplan?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env — generate with: openssl rand -base64 32}
+      AUTH_TRUST_HOST: "true"
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      # Photos uploaded with private recipes (Phase 2).
+      - uploads:/app/uploads
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fridgeplan
+      POSTGRES_USER: fridgeplan
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fridgeplan}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fridgeplan -d fridgeplan"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  uploads:

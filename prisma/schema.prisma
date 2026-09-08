@@ -1,0 +1,296 @@
+// Fridge & recipe app — v1 schema (see execution plan §3).
+// One schema serves both deployment modes: public hosted (multi-tenant) and
+// personal self-host (a single implicit user row). Nothing here assumes
+// single-user, so a self-host instance can be upgraded to households later.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // The connection URL lives in prisma.config.ts (CLI) and is passed to the
+  // client through the pg driver adapter at runtime — Prisma 7 no longer
+  // accepts `url` here.
+}
+
+// ---------------------------------------------------------------------------
+// Users, households
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  // Null for OAuth-only users. Auth.js OAuth data lives in `Account`, so
+  // adding providers later needs no schema change.
+  passwordHash  String?
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts          Account[]
+  sessions          Session[]
+  householdMembers  HouseholdMember[]
+  fridges           Fridge[]
+  recipes           Recipe[]
+  aiProviderConfigs AIProviderConfig[]
+}
+
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members HouseholdMember[]
+  fridges Fridge[]
+}
+
+enum HouseholdRole {
+  owner
+  member
+}
+
+model HouseholdMember {
+  id          String        @id @default(cuid())
+  userId      String
+  householdId String
+  role        HouseholdRole @default(member)
+  joinedAt    DateTime      @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, householdId])
+  @@index([householdId])
+}
+
+// ---------------------------------------------------------------------------
+// Fridges & compartments
+// ---------------------------------------------------------------------------
+
+enum FridgeType {
+  french_door
+  top_freezer
+  bottom_freezer
+  side_by_side
+}
+
+model Fridge {
+  id          String     @id @default(cuid())
+  // A fridge belongs to a household OR directly to a user. Exactly one of
+  // these is set; enforced in application code.
+  householdId String?
+  ownerUserId String?
+  name        String
+  type        FridgeType
+  // Shape of the fridge, e.g. { "middleDrawers": 2, "freezerDrawers": 1 }.
+  // Compartments are generated from this at creation time, not from presets.
+  config      Json       @default("{}")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  household    Household?    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  owner        User?         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  compartments Compartment[]
+
+  @@index([householdId])
+  @@index([ownerUserId])
+}
+
+enum CompartmentType {
+  fridge_main
+  fridge_door
+  freezer
+  freezer_door
+  middle_drawer
+  crisper_drawer
+  deli_drawer
+}
+
+model Compartment {
+  id        String          @id @default(cuid())
+  fridgeId  String
+  type      CompartmentType
+  label     String
+  // Render/display order within the fridge.
+  position  Int
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  fridge Fridge          @relation(fields: [fridgeId], references: [id], onDelete: Cascade)
+  items  InventoryItem[]
+
+  @@index([fridgeId])
+}
+
+// ---------------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------------
+
+enum Unit {
+  g
+  kg
+  ml
+  l
+  cup
+  tbsp
+  tsp
+  oz
+  lb
+  count
+}
+
+model Ingredient {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  // Alternate names used for autocomplete and recipe-ingredient matching.
+  aliases   String[] @default([])
+  createdAt DateTime @default(now())
+
+  inventoryItems InventoryItem[]
+}
+
+model InventoryItem {
+  id             String    @id @default(cuid())
+  compartmentId  String
+  ingredientId   String
+  // Decimal, not Float: quantities are user-entered amounts we later
+  // decrement against recipe amounts.
+  quantity       Decimal   @db.Decimal(10, 3)
+  unit           Unit
+  dateAdded      DateTime  @default(now())
+  expirationDate DateTime?
+  // Set when the item is used up / discarded rather than deleting the row,
+  // so cook-confirmation history stays inspectable.
+  consumedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  compartment Compartment @relation(fields: [compartmentId], references: [id], onDelete: Cascade)
+  ingredient  Ingredient  @relation(fields: [ingredientId], references: [id])
+
+  @@index([compartmentId])
+  @@index([ingredientId])
+  @@index([expirationDate])
+}
+
+// ---------------------------------------------------------------------------
+// Recipes
+// ---------------------------------------------------------------------------
+
+model Recipe {
+  id           String  @id @default(cuid())
+  // Which provider this came from ("themealdb", "spoonacular", "user").
+  sourceApi    String
+  externalId   String?
+  title        String
+  cuisine      String?
+  imageUrl     String?
+  // [{ name, quantity, unit, raw }] — normalized at import time.
+  ingredients  Json    @default("[]")
+  instructions String  @default("")
+  isPrivate    Boolean @default(false)
+  ownerUserId  String?
+  // Spoonacular's terms permit caching for at most 1 hour, so rows sourced
+  // from it carry an expiry and are never treated as a permanent mirror.
+  // TheMealDB rows leave this null and are cached indefinitely with attribution.
+  cacheExpiresAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  owner User? @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceApi, externalId])
+  @@index([ownerUserId])
+  @@index([cacheExpiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// AI provider config & deployment mode
+// ---------------------------------------------------------------------------
+
+enum AIProviderScope {
+  instance
+  user
+}
+
+model AIProviderConfig {
+  id             String          @id @default(cuid())
+  scope          AIProviderScope
+  // Null for instance scope.
+  userId         String?
+  // "nvidia_nim" | "gemini" | "openai_compatible" | "anthropic" | "claude_code"
+  provider       String
+  apiKeyEncrypted String?
+  model          String?
+  // Extra provider-specific settings (base URL for OpenAI-compatible, etc.).
+  settings       Json            @default("{}")
+  isActive       Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([scope, isActive])
+}
+
+enum DeploymentModeKind {
+  personal_self_host
+  public_hosted
+}
+
+// Singleton: exactly one row, id = "singleton", written by first-run setup.
+model DeploymentMode {
+  id         String             @id @default("singleton")
+  mode       DeploymentModeKind
+  setupAt    DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js tables (OAuth-ready; unused columns stay null for email/password)
+// ---------------------------------------------------------------------------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
