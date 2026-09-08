@@ -1,46 +1,61 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getDeploymentMode } from '@/lib/deployment-mode';
-import { getCurrentUser } from '@/lib/current-user';
+import { requireUserPage } from '@/lib/page-guards';
+import { getFridgeForUser, listFridges } from '@/lib/fridges';
+import { serializeFridge } from '@/lib/serialize';
+import { FridgeView } from '@/components/fridge-view';
 
-// Every page here branches on the DeploymentMode row, so nothing may be
-// prerendered at build time.
+// The landing view reads live inventory, so it is never prerendered.
 export const dynamic = 'force-dynamic';
 
-export default async function HomePage() {
-  const mode = await getDeploymentMode();
-  if (!mode) redirect('/setup');
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ fridge?: string }>;
+}) {
+  const user = await requireUserPage();
+  const { fridge: requestedId } = await searchParams;
 
-  const user = await getCurrentUser();
+  const fridges = await listFridges(user.id);
+  // Onboarding: with no fridge yet, the fridge builder *is* the landing page.
+  if (fridges.length === 0) redirect('/fridges/new');
+
+  const targetId = requestedId ?? fridges[0]!.id;
+  const fridge = await getFridgeForUser(targetId, user.id);
+  if (!fridge) redirect('/');
+
+  const totalItems = fridge.compartments.reduce(
+    (count, compartment) => count + compartment.items.length,
+    0,
+  );
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-16">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Fridgeplan</h1>
-        <p className="text-slate-600 dark:text-slate-400">
-          Your fridge is the interface. Phase 0 scaffold — fridge selection and inventory land in
-          Phase 1.
-        </p>
-      </header>
+    <main className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6">
+      <FridgeView
+        fridge={serializeFridge(fridge)}
+        otherFridges={fridges
+          .filter((entry) => entry.id !== fridge.id)
+          .map((entry) => ({ id: entry.id, name: entry.name }))}
+      />
 
-      <dl className="grid gap-3 rounded-xl border border-slate-200 bg-white p-5 text-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex justify-between gap-4">
-          <dt className="text-slate-500">Deployment mode</dt>
-          <dd className="font-medium">{mode.replace(/_/g, ' ')}</dd>
-        </div>
-        <div className="flex justify-between gap-4">
-          <dt className="text-slate-500">Signed in as</dt>
-          <dd className="font-medium">{user ? user.email : 'guest (not signed in)'}</dd>
-        </div>
-      </dl>
-
-      {mode === 'public_hosted' && !user ? (
-        <Link
-          href="/signin"
-          className="w-fit rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900"
-        >
-          Sign in
-        </Link>
+      {totalItems > 0 ? (
+        <section className="flex flex-wrap gap-3 border-t border-slate-200 pt-6 dark:border-slate-800">
+          {/* Recipes arrive in Phase 2; the entry points live here. */}
+          <Link
+            href="/recipes/suggest"
+            aria-disabled
+            className="pointer-events-none rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium opacity-50 dark:border-slate-700"
+          >
+            Suggest recipes (Phase 2)
+          </Link>
+          <Link
+            href="/recipes/search"
+            aria-disabled
+            className="pointer-events-none rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium opacity-50 dark:border-slate-700"
+          >
+            Search recipes (Phase 2)
+          </Link>
+        </section>
       ) : null}
     </main>
   );

@@ -13,10 +13,26 @@ Which one an instance is gets decided once, in the first-run setup wizard.
 
 ## Status
 
-**Phase 0 (scaffold) is in place:** Next.js + TypeScript + Tailwind app shell,
-Prisma schema for the full v1 data model, Auth.js email/password skeleton,
-deployment-mode wizard, Docker/compose deployment. Fridge selection, inventory,
-recipes and the visual pass follow in Phases 1–3.
+**Phase 0 (scaffold)** — Next.js + TypeScript + Tailwind app shell, Prisma
+schema for the full v1 data model, Auth.js email/password skeleton,
+deployment-mode wizard, Docker/compose deployment.
+
+**Phase 1 (fridges and inventory)** — fridge-type selection with illustrated
+options, the French-door drawer-count builder with a live preview,
+dynamically generated compartments, add/rename/delete/replace of fridges, and
+inventory CRUD: ingredient typeahead, structured amount + unit, optional
+purchase and expiry dates, "used up" without losing history, and expiry flags
+(amber three days out, red on or after the date — always tint plus icon plus
+words).
+
+Replacing a fridge asks what should happen to the inventory inside: move it
+across (matching compartment where there is one, main fridge or freezer section
+otherwise), or delete it — the latter behind two further confirmations.
+
+**Phase 2** brings recipes (suggest/search, missing ingredients, substitutions,
+cook-confirmation decrement, private recipes) and the AI provider abstraction;
+**Phase 3** is the full visual and animation pass. Recipe buttons appear on the
+fridge page once you have inventory, disabled until then.
 
 ## Stack
 
