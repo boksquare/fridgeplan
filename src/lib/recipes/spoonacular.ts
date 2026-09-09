@@ -1,8 +1,9 @@
+import { env, envOr } from '@/lib/env';
 import { parseMeasure } from '@/lib/recipes/measure';
 import { RecipeProviderError } from '@/lib/recipes/types';
 import type { ProviderRecipe, RecipeProvider, SearchOptions } from '@/lib/recipes/types';
 
-const BASE = process.env.SPOONACULAR_BASE_URL ?? 'https://api.spoonacular.com';
+const BASE = envOr('SPOONACULAR_BASE_URL', 'https://api.spoonacular.com');
 
 /**
  * Spoonacular's terms allow caching results for at most one hour and require
@@ -28,7 +29,7 @@ type SpoonacularInfo = {
 };
 
 function apiKey(): string {
-  const key = process.env.SPOONACULAR_API_KEY;
+  const key = env('SPOONACULAR_API_KEY');
   if (!key) throw new RecipeProviderError('spoonacular', 'No Spoonacular API key is configured.');
   return key;
 }
@@ -38,13 +39,21 @@ async function get<T>(path: string, params: Record<string, string>): Promise<T> 
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   url.searchParams.set('apiKey', apiKey());
 
-  const res = await fetch(url, { cache: 'no-store' });
+  let res: Response;
+  try {
+    res = await fetch(url, { cache: 'no-store' });
+  } catch (error) {
+    throw new RecipeProviderError(
+      'spoonacular',
+      `could not reach ${url.host} (${(error as Error).message})`,
+    );
+  }
   if (!res.ok) {
     throw new RecipeProviderError(
       'spoonacular',
       res.status === 402
         ? 'The Spoonacular daily quota is used up.'
-        : `Spoonacular returned ${res.status}`,
+        : `${url.host} returned HTTP ${res.status}`,
     );
   }
   return (await res.json()) as T;

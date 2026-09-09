@@ -55,6 +55,14 @@ export async function searchRecipes(input: {
     ? [getProvider(input.sourceApi)].filter((provider) => provider !== null)
     : availableProviders();
 
+  // Never fail silently: with no source, search can only ever return the
+  // household's own recipes, and the caller needs to know why.
+  if (providers.length === 0) {
+    errors.push(
+      'No recipe source is enabled, so only your own recipes were searched. Check RECIPE_PROVIDERS in this instance’s configuration.',
+    );
+  }
+
   const fetched: ProviderRecipe[] = [];
   for (const provider of providers) {
     try {
@@ -62,7 +70,7 @@ export async function searchRecipes(input: {
         ...(await provider.searchByText({ query: input.query, cuisine: input.cuisine, limit })),
       );
     } catch (error) {
-      errors.push((error as Error).message);
+      errors.push(`${provider.label}: ${(error as Error).message}`);
     }
   }
 
@@ -99,6 +107,13 @@ export async function suggestRecipes(input: { userId: string; limit?: number }) 
     return { results: [], errors, inventoryCount: 0 };
   }
 
+  const providers = availableProviders();
+  if (providers.length === 0) {
+    errors.push(
+      'No recipe source is enabled, so only your own recipes were matched. Check RECIPE_PROVIDERS in this instance’s configuration.',
+    );
+  }
+
   // Ask for the ingredients there is most of first; providers cap how many
   // they will consider.
   const names = [...inventory]
@@ -106,11 +121,11 @@ export async function suggestRecipes(input: { userId: string; limit?: number }) 
     .map((entry) => entry.ingredientName);
 
   const fetched: ProviderRecipe[] = [];
-  for (const provider of availableProviders()) {
+  for (const provider of providers) {
     try {
       fetched.push(...(await provider.searchByIngredients(names, limit)));
     } catch (error) {
-      errors.push((error as Error).message);
+      errors.push(`${provider.label}: ${(error as Error).message}`);
     }
   }
 

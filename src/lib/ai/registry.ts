@@ -1,3 +1,4 @@
+import { env } from '@/lib/env';
 import { prisma } from '@/lib/prisma';
 import { decryptSecret } from '@/lib/crypto';
 import { getDeploymentMode } from '@/lib/deployment-mode';
@@ -115,7 +116,7 @@ export async function resolveAIConfiguration(
 
   // Config-file (env) fallback: the only way to configure a hosted instance for
   // now — an admin panel is deliberately deferred.
-  const envProviderId = process.env.AI_PROVIDER?.trim();
+  const envProviderId = env('AI_PROVIDER');
   if (!envProviderId) {
     return {
       active: null,
@@ -144,9 +145,9 @@ export async function resolveAIConfiguration(
     provider,
     scope: 'instance',
     config: {
-      apiKey: process.env.AI_API_KEY?.trim() || undefined,
-      model: process.env.AI_MODEL?.trim() || undefined,
-      baseUrl: process.env.AI_BASE_URL?.trim() || undefined,
+      apiKey: env('AI_API_KEY'),
+      model: env('AI_MODEL'),
+      baseUrl: env('AI_BASE_URL'),
     },
   });
 }

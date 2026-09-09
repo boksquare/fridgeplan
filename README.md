@@ -224,6 +224,17 @@ migrations before the app starts serving:
 git pull && docker compose up --build -d
 ```
 
+**When something remote is not working**, open Settings → Diagnostics (or
+`GET /api/diagnostics`). It makes real calls to each configured recipe source
+and to the AI provider and reports the error text, which is faster than reading
+container logs.
+
+**Optional variables must be read with the helper in `src/lib/env.ts`**, never
+`process.env.X ?? fallback`. docker-compose passes optional variables as
+`${VAR:-}`, so anything the operator did not set arrives as an empty string
+rather than absent, and `??` does not fall through for `""`. That mismatch
+silently disabled every recipe source in Docker while working fine locally.
+
 **Commands that run inside the container** need their files in the runtime
 image, which is not the whole repo. Today that is `prisma migrate deploy` (the
 entrypoint), `prisma db seed` and `npm run purge:provider` — so the image

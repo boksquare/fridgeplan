@@ -2,13 +2,30 @@ import { parseMeasure } from '@/lib/recipes/measure';
 import { RecipeProviderError } from '@/lib/recipes/types';
 import type { ProviderRecipe, RecipeProvider, SearchOptions } from '@/lib/recipes/types';
 
-const BASE = process.env.THEMEALDB_BASE_URL ?? 'https://www.themealdb.com/api/json/v1/1';
+import { envOr } from '@/lib/env';
+
+const BASE = envOr('THEMEALDB_BASE_URL', 'https://www.themealdb.com/api/json/v1/1');
 
 type MealRow = Record<string, string | null> & { idMeal: string; strMeal: string };
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}/${path}`, { cache: 'no-store' });
-  if (!res.ok) throw new RecipeProviderError('themealdb', `TheMealDB returned ${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/${path}`, { cache: 'no-store' });
+  } catch (error) {
+    // A blocked or offline container says "fetch failed" and nothing else, so
+    // name what could not be reached.
+    throw new RecipeProviderError(
+      'themealdb',
+      `could not reach ${new URL(BASE).host} (${(error as Error).message})`,
+    );
+  }
+  if (!res.ok) {
+    throw new RecipeProviderError(
+      'themealdb',
+      `${new URL(BASE).host} returned HTTP ${res.status}`,
+    );
+  }
   return (await res.json()) as T;
 }
 
@@ -65,13 +82,21 @@ export const theMealDbProvider: RecipeProvider = {
     // No multi-ingredient endpoint exists, so filter by each ingredient and
     // rank by how many of them a recipe turns up under.
     const hits = new Map<string, { stub: MealRow; matches: number }>();
+    const wanted = names.slice(0, 6);
+    let failures: Error | null = null;
+    let failed = 0;
 
-    for (const name of names.slice(0, 6)) {
+    for (const name of wanted) {
       let body: { meals: MealRow[] | null };
       try {
         body = await get<{ meals: MealRow[] | null }>(`filter.php?i=${encodeURIComponent(name)}`);
-      } catch {
-        continue; // An unknown ingredient just contributes nothing.
+      } catch (error) {
+        // One unknown ingredient contributes nothing, but every lookup failing
+        // means the source is unreachable, not that the fridge is exotic —
+        // report that instead of pretending nothing matched.
+        failures = error as Error;
+        failed += 1;
+        continue;
       }
       for (const stub of body.meals ?? []) {
         const existing = hits.get(stub.idMeal);
@@ -79,6 +104,8 @@ export const theMealDbProvider: RecipeProvider = {
         else hits.set(stub.idMeal, { stub, matches: 1 });
       }
     }
+
+    if (failures && failed === wanted.length && wanted.length > 0) throw failures;
 
     const ranked = [...hits.values()]
       .sort((a, b) => b.matches - a.matches)

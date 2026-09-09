@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { env } from '@/lib/env';
 import { AIProviderError } from '@/lib/ai/types';
 import type { AIProvider } from '@/lib/ai/types';
 
@@ -23,7 +24,7 @@ export const claudeCodeProvider: AIProvider = {
   defaultModel: 'default',
 
   async chat(request, config) {
-    const binary = config.baseUrl?.trim() || process.env.CLAUDE_CODE_BIN || 'claude';
+    const binary = config.baseUrl?.trim() || env('CLAUDE_CODE_BIN') || 'claude';
     const args = [
       '-p',
       request.prompt,

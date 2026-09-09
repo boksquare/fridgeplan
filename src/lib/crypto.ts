@@ -1,3 +1,4 @@
+import { env } from '@/lib/env';
 import {
   createCipheriv,
   createDecipheriv,
@@ -12,7 +13,10 @@ import {
  * self-hoster has nothing extra to configure.
  */
 function encryptionKey(): Buffer {
-  const secret = process.env.AI_ENCRYPTION_KEY ?? process.env.AUTH_SECRET;
+  // Empty is absent: compose passes AI_ENCRYPTION_KEY as "" when unset, and
+  // `??` would have used that empty string instead of falling back to
+  // AUTH_SECRET, so storing a provider key failed.
+  const secret = env('AI_ENCRYPTION_KEY') ?? env('AUTH_SECRET');
   if (!secret) {
     throw new Error('Set AUTH_SECRET (or AI_ENCRYPTION_KEY) before storing provider keys.');
   }

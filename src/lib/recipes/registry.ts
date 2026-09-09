@@ -1,3 +1,4 @@
+import { env, envList } from '@/lib/env';
 import { theMealDbProvider } from '@/lib/recipes/themealdb';
 import { spoonacularProvider } from '@/lib/recipes/spoonacular';
 import type { RecipeProvider } from '@/lib/recipes/types';
@@ -11,12 +12,13 @@ import type { RecipeProvider } from '@/lib/recipes/types';
 const ALL: RecipeProvider[] = [theMealDbProvider, spoonacularProvider];
 
 export function availableProviders(): RecipeProvider[] {
-  const configured = process.env.RECIPE_PROVIDERS?.split(',')
-    .map((id) => id.trim())
-    .filter(Boolean);
+  // envList treats an empty RECIPE_PROVIDERS as unset. Reading it with `??`
+  // yielded an empty-but-truthy list under docker-compose, which filtered every
+  // source out and made suggest and search return nothing at all.
+  const configured = envList('RECIPE_PROVIDERS');
 
   const enabled = ALL.filter((provider) => {
-    if (provider.id === 'spoonacular' && !process.env.SPOONACULAR_API_KEY) return false;
+    if (provider.id === 'spoonacular' && !env('SPOONACULAR_API_KEY')) return false;
     return configured ? configured.includes(provider.id) : true;
   });
 

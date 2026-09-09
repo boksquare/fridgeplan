@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { env } from '@/lib/env';
 
 /**
  * Photos for private recipes live on a plain volume (docker-compose mounts one
  * at /app/uploads) rather than in an object store, so self-hosting needs no
  * extra service.
  */
-export const UPLOAD_DIR = process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'uploads');
+export const UPLOAD_DIR = env('UPLOAD_DIR') ?? path.join(process.cwd(), 'uploads');
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED: Record<string, string> = {

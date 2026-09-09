@@ -59,8 +59,12 @@ export async function POST(request: Request) {
 
   const errors: string[] = [];
   const fetched: ProviderRecipe[] = [];
+  const providers = availableProviders();
+  if (providers.length === 0) {
+    errors.push('No recipe source is enabled on this instance.');
+  }
 
-  for (const provider of availableProviders()) {
+  for (const provider of providers) {
     try {
       if (parsed.data.mode === 'suggest') {
         if (inventory.length === 0) continue;
@@ -78,7 +82,7 @@ export async function POST(request: Request) {
         );
       }
     } catch (error) {
-      errors.push((error as Error).message);
+      errors.push(`${provider.label}: ${(error as Error).message}`);
     }
   }
 

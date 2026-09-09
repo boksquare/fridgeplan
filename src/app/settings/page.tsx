@@ -38,6 +38,20 @@ export default async function SettingsPage() {
           Open AI provider settings
         </Link>
       </section>
+
+      <section className="flex flex-col gap-3 border-t border-slate-200 pt-6 dark:border-slate-800">
+        <h2 className="text-lg font-semibold">Diagnostics</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Check whether the recipe sources and the AI provider are actually reachable from this
+          instance, with the error text when they are not.
+        </p>
+        <Link
+          href="/settings/diagnostics"
+          className="w-fit rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+        >
+          Run diagnostics
+        </Link>
+      </section>
     </main>
   );
 }
