@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { badRequest, withUser } from '@/lib/api';
 import { encryptSecret, maskSecret } from '@/lib/crypto';
 import { getDeploymentMode } from '@/lib/deployment-mode';
-import { findProvider, resolveActiveProvider, selectableProviders } from '@/lib/ai/registry';
+import { findProvider, resolveAIConfiguration, selectableProviders } from '@/lib/ai/registry';
 
 /** What the UI needs to show "Powered by …" and, on self-host, a picker. */
 export async function GET() {
@@ -12,7 +12,7 @@ export async function GET() {
   if (response) return response;
 
   const mode = await getDeploymentMode();
-  const active = await resolveActiveProvider(user.id);
+  const { active, problem } = await resolveAIConfiguration(user.id);
   const providers = await selectableProviders();
 
   return NextResponse.json({
@@ -22,6 +22,8 @@ export async function GET() {
     active: active
       ? { id: active.provider.id, label: active.provider.label, model: active.config.model ?? active.provider.defaultModel, scope: active.scope }
       : null,
+    // Why there is no usable provider, when there is not one.
+    problem,
     providers: providers.map((provider) => ({
       id: provider.id,
       label: provider.label,

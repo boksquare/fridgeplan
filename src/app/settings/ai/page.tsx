@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireUserPage } from '@/lib/page-guards';
 import { getDeploymentMode } from '@/lib/deployment-mode';
-import { resolveActiveProvider, selectableProviders } from '@/lib/ai/registry';
+import { resolveAIConfiguration, selectableProviders } from '@/lib/ai/registry';
 import { AISettingsForm } from '@/components/ai-settings-form';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +10,7 @@ export const metadata = { title: 'AI provider — Fridgeplan' };
 export default async function AISettingsPage() {
   const user = await requireUserPage();
   const mode = await getDeploymentMode();
-  const active = await resolveActiveProvider(user.id);
+  const { active, problem } = await resolveAIConfiguration(user.id);
   const providers = await selectableProviders();
 
   return (
@@ -28,16 +28,25 @@ export default async function AISettingsPage() {
         </p>
       </header>
 
-      <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
-        {active ? (
-          <>
-            Currently using <span className="font-medium">{active.provider.label}</span>
-            {active.config.model ? ` (${active.config.model})` : ''}.
-          </>
-        ) : (
-          'No provider is configured yet, so substitution suggestions are unavailable.'
-        )}
-      </p>
+      <div className="flex flex-col gap-3">
+        <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+          {active ? (
+            <>
+              Currently using <span className="font-medium">{active.provider.label}</span>
+              {active.config.model ? ` (${active.config.model})` : ''}.
+            </>
+          ) : (
+            'No provider is configured yet, so substitution suggestions are unavailable.'
+          )}
+        </p>
+
+        {/* Says which of the several "not configured" states this actually is. */}
+        {problem ? (
+          <p className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+            {problem}
+          </p>
+        ) : null}
+      </div>
 
       {mode === 'personal_self_host' ? (
         <AISettingsForm

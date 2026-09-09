@@ -44,8 +44,28 @@ export type ActiveProvider = {
  * - personal self-host: the user's own choice in settings, falling back to the
  *   instance config so a fresh install still works.
  */
-export async function resolveActiveProvider(userId?: string): Promise<ActiveProvider | null> {
+/**
+ * The active provider, or a plain-language reason there is not one.
+ *
+ * Every "no provider" case used to look identical in the UI, which makes a
+ * misconfigured instance indistinguishable from an unconfigured one — a
+ * commented-out AI_PROVIDER, a typo in its value, a self-host-only provider on
+ * a hosted instance and a missing key all read as "nothing configured". So the
+ * reason travels with the answer.
+ */
+export async function resolveAIConfiguration(
+  userId?: string,
+): Promise<{ active: ActiveProvider | null; problem: string | null }> {
   const mode = await getDeploymentMode();
+  const known = PROVIDERS.map((provider) => provider.id).join(', ');
+
+  const withKeyCheck = (active: ActiveProvider) => ({
+    active,
+    problem:
+      active.provider.needsApiKey && !active.config.apiKey
+        ? `${active.provider.label} is selected but no API key is set, so requests would be rejected.`
+        : null,
+  });
 
   if (mode === 'personal_self_host' && userId) {
     const row = await prisma.aIProviderConfig.findFirst({
@@ -53,9 +73,14 @@ export async function resolveActiveProvider(userId?: string): Promise<ActiveProv
     });
     if (row) {
       const provider = findProvider(row.provider);
-      if (!provider) return null;
+      if (!provider) {
+        return {
+          active: null,
+          problem: `Your saved provider "${row.provider}" is not one this build knows (${known}). Pick another below.`,
+        };
+      }
       const settings = (row.settings ?? {}) as { baseUrl?: string };
-      return {
+      return withKeyCheck({
         provider,
         scope: 'user',
         config: {
@@ -63,7 +88,7 @@ export async function resolveActiveProvider(userId?: string): Promise<ActiveProv
           model: row.model ?? undefined,
           baseUrl: settings.baseUrl,
         },
-      };
+      });
     }
   }
 
@@ -74,47 +99,67 @@ export async function resolveActiveProvider(userId?: string): Promise<ActiveProv
     const provider = findProvider(instanceRow.provider);
     if (provider && (!provider.selfHostOnly || mode === 'personal_self_host')) {
       const settings = (instanceRow.settings ?? {}) as { baseUrl?: string };
-      return {
+      return withKeyCheck({
         provider,
         scope: 'instance',
         config: {
-          apiKey: instanceRow.apiKeyEncrypted ? decryptSecret(instanceRow.apiKeyEncrypted) : undefined,
+          apiKey: instanceRow.apiKeyEncrypted
+            ? decryptSecret(instanceRow.apiKeyEncrypted)
+            : undefined,
           model: instanceRow.model ?? undefined,
           baseUrl: settings.baseUrl,
         },
-      };
+      });
     }
   }
 
   // Config-file (env) fallback: the only way to configure a hosted instance for
   // now — an admin panel is deliberately deferred.
-  const envProviderId = process.env.AI_PROVIDER;
-  if (!envProviderId) return null;
-  const provider = findProvider(envProviderId);
-  if (!provider) return null;
-  if (provider.selfHostOnly && mode !== 'personal_self_host') return null;
+  const envProviderId = process.env.AI_PROVIDER?.trim();
+  if (!envProviderId) {
+    return {
+      active: null,
+      problem:
+        mode === 'personal_self_host'
+          ? null
+          : `No AI provider is set. Set AI_PROVIDER (one of: ${known}) and its API key in this instance's configuration, then restart it. If you edited .env, check the lines are not still commented out with "#".`,
+    };
+  }
 
-  return {
+  const provider = findProvider(envProviderId);
+  if (!provider) {
+    return {
+      active: null,
+      problem: `AI_PROVIDER is set to "${envProviderId}", which is not a provider this build knows. Expected one of: ${known}.`,
+    };
+  }
+  if (provider.selfHostOnly && mode !== 'personal_self_host') {
+    return {
+      active: null,
+      problem: `${provider.label} only runs on a personal self-host instance, so it is ignored on a hosted one.`,
+    };
+  }
+
+  return withKeyCheck({
     provider,
     scope: 'instance',
     config: {
-      apiKey: process.env.AI_API_KEY,
-      model: process.env.AI_MODEL,
-      baseUrl: process.env.AI_BASE_URL,
+      apiKey: process.env.AI_API_KEY?.trim() || undefined,
+      model: process.env.AI_MODEL?.trim() || undefined,
+      baseUrl: process.env.AI_BASE_URL?.trim() || undefined,
     },
-  };
+  });
+}
+
+export async function resolveActiveProvider(userId?: string): Promise<ActiveProvider | null> {
+  return (await resolveAIConfiguration(userId)).active;
 }
 
 export async function runAI(request: AIRequest, userId?: string): Promise<AIResponse> {
-  const active = await resolveActiveProvider(userId);
+  const { active, problem } = await resolveAIConfiguration(userId);
   if (!active) {
-    throw new AIProviderError('none', 'No AI provider is configured on this instance.');
+    throw new AIProviderError('none', problem ?? 'No AI provider is configured on this instance.');
   }
-  if (active.provider.needsApiKey && !active.config.apiKey) {
-    throw new AIProviderError(
-      active.provider.id,
-      `${active.provider.label} needs an API key before it can be used.`,
-    );
-  }
+  if (problem) throw new AIProviderError(active.provider.id, problem);
   return active.provider.chat(request, active.config);
 }
