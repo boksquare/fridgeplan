@@ -201,6 +201,15 @@ migrations before the app starts serving:
 git pull && docker compose up --build -d
 ```
 
+**Commands that run inside the container** need their files in the runtime
+image, which is not the whole repo. Today that is `prisma migrate deploy` (the
+entrypoint), `prisma db seed` and `npm run purge:provider` — so the image
+carries `prisma/`, `prisma.config.ts`, `scripts/` and the generated Prisma
+client in `src/generated/`, on top of the standalone server bundle. The bundle
+inlines the client for the app itself, so a script run through `tsx` is the only
+reason `src/generated/` is there. Add a script that runs in the container and
+you must copy what it imports too.
+
 **The production build must not need a database.** `next build` evaluates every
 route module to collect its config, and the Docker build has no Postgres — so
 `src/lib/prisma.ts` connects on first *use* rather than on import. Anything that

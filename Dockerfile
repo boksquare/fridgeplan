@@ -38,6 +38,11 @@ COPY --from=build --chown=nextjs:nodejs /app/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=build --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build --chown=nextjs:nodejs /app/package.json ./package.json
+# The generated Prisma client. The server bundle inlines it, but `prisma db
+# seed` runs prisma/seed.ts through tsx at runtime and imports it from here.
+COPY --from=build --chown=nextjs:nodejs /app/src/generated ./src/generated
+# Maintenance scripts run inside the container, e.g. `npm run purge:provider`.
+COPY --from=build --chown=nextjs:nodejs /app/scripts ./scripts
 COPY --chown=nextjs:nodejs docker/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh && mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
 
