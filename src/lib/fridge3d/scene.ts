@@ -48,6 +48,16 @@ type PanelObject = {
   target: number;
 };
 
+/** Small stable hash, so an item's spot depends on the item, not the order. */
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash);
+}
+
 function isFreezerish(compartments: SceneCompartment[]): boolean {
   return (
     compartments.length > 0 &&
@@ -66,10 +76,17 @@ export class FridgeScene {
   private pointer = new THREE.Vector2();
   private frame = 0;
   private disposed = false;
+  /** The panel left open, so a rebuild does not shut it. */
+  private openPanelId: string | null = null;
   private needsRender = true;
   private hovered: string | null = null;
+  /** Permanent resources, freed on dispose. */
   private geometries: THREE.BufferGeometry[] = [];
+  /** Resources belonging to the current model, freed on every rebuild. */
+  private modelGeometries: THREE.BufferGeometry[] = [];
+  private modelMaterials: THREE.Material[] = [];
   private environment: THREE.Texture | null = null;
+  private extras: { dispose(): void }[] = [];
 
   reducedMotion = false;
   onSelect: ((panelId: string) => void) | null = null;
@@ -145,6 +162,7 @@ export class FridgeScene {
       transparent: true,
       depthWrite: false,
     });
+    this.extras.push(texture, material);
     const plane = new THREE.Mesh(geometry, material);
     plane.rotation.x = -Math.PI / 2;
     plane.position.set(0, -CABINET.height / 2 - 0.002, CABINET.depth * 0.1);
@@ -160,7 +178,8 @@ export class FridgeScene {
       2,
       Math.min(radius, Math.min(width, height, depth) / 2.2),
     );
-    this.geometries.push(geometry);
+    // Belongs to this model: freed when the model is rebuilt.
+    this.modelGeometries.push(geometry);
     return geometry;
   }
 
@@ -197,7 +216,27 @@ export class FridgeScene {
       columnX += columnWidth;
     }
 
+    // A rebuild starts every panel shut, so restore whatever was open —
+    // instantly, because from the viewer's side that door never moved.
+    if (this.openPanelId) {
+      for (const panel of this.panels) {
+        if (panel.id !== this.openPanelId) continue;
+        panel.open = 1;
+        panel.target = 1;
+        this.applyPanelTransform(panel);
+      }
+    }
+
     this.needsRender = true;
+  }
+
+  private applyPanelTransform(panel: PanelObject) {
+    if (panel.opens === 'door') {
+      const direction = panel.hinge === 'left' ? -1 : 1;
+      panel.pivot.rotation.y = direction * DOOR_OPEN_RADIANS * panel.open;
+    } else {
+      panel.pivot.position.z = DRAWER_TRAVEL * panel.open;
+    }
   }
 
   /**
@@ -269,6 +308,7 @@ export class FridgeScene {
     // The lamp, plus a point light: an interior is only convincing when it is
     // actually lit from inside, which the environment map cannot do.
     const lampMaterial = this.materials.lightPanel.clone();
+    this.modelMaterials.push(lampMaterial);
     const lamp = new THREE.Mesh(
       this.box(innerWidth * 0.5, 0.014, 0.022, 0.005),
       lampMaterial,
@@ -393,6 +433,7 @@ export class FridgeScene {
 
     // A thin lit accent along the bottom of every front.
     const accentMaterial = this.materials.accent.clone();
+    this.modelMaterials.push(accentMaterial);
     const accent = new THREE.Mesh(
       this.box(innerWidth * 0.6, 0.006, 0.008, 0.003),
       accentMaterial,
@@ -460,8 +501,13 @@ export class FridgeScene {
     // Items sit in the basket, in rows, so a full drawer looks full.
     const items = panel.compartments.flatMap((compartment) => compartment.itemLabels ?? []);
     const perRow = Math.max(2, Math.floor(basketWidth / 0.12));
-    items.slice(0, perRow * 3).forEach((item, index) => {
-      const size = 0.055 + ((index * 5) % 3) * 0.01;
+    const used = new Set<number>();
+    items.slice(0, perRow * 3).forEach((item) => {
+      const seed = hashString(item.id);
+      let cell = seed % (perRow * 3);
+      while (used.has(cell)) cell = (cell + 1) % (perRow * 3);
+      used.add(cell);
+      const size = 0.055 + (seed % 3) * 0.01;
       const mesh = new THREE.Mesh(
         this.box(size, Math.min(size * 1.4, basketHeight * 0.8), size, 0.008),
         this.materials.item[
@@ -469,9 +515,9 @@ export class FridgeScene {
         ],
       );
       mesh.position.set(
-        -basketWidth / 2 + 0.07 + (index % perRow) * 0.115,
+        -basketWidth / 2 + 0.07 + (cell % perRow) * 0.115,
         -basketHeight / 2 + Math.min(size * 0.75, basketHeight * 0.42),
-        -depth / 2 + 0.1 + Math.floor(index / perRow) * 0.14,
+        -depth / 2 + 0.1 + Math.floor(cell / perRow) * 0.14,
       );
       basket.add(mesh);
     });
@@ -522,15 +568,28 @@ export class FridgeScene {
 
     // Items sit on the shelves, coloured by how close they are to expiring.
     const perShelf = Math.max(2, Math.floor((width - 0.1) / 0.11));
-    // Round-robin across the shelves, so a half-full fridge is not all stacked
-    // on the top one.
-    items.slice(0, shelves.length * perShelf).forEach((item, index) => {
-      const shelfIndex = index % shelves.length;
-      const slot = Math.floor(index / shelves.length) % perShelf;
+    // Placement follows the item's identity, not its position in the array, so
+    // adding one thing does not shuffle everything already on the shelves.
+    const taken = new Set<string>();
+    items.slice(0, shelves.length * perShelf).forEach((item) => {
+      const seed = hashString(item.id);
+      let shelfIndex = seed % shelves.length;
+      let slot = (seed >> 8) % perShelf;
+      // Linear probe for a free spot, so two items never share one.
+      for (let attempt = 0; attempt < shelves.length * perShelf; attempt += 1) {
+        if (!taken.has(`${shelfIndex}:${slot}`)) break;
+        slot += 1;
+        if (slot >= perShelf) {
+          slot = 0;
+          shelfIndex = (shelfIndex + 1) % shelves.length;
+        }
+      }
+      taken.add(`${shelfIndex}:${slot}`);
+
       const shelfY = shelves[shelfIndex] ?? 0;
       // A little variety in size and depth so the shelves do not read as a grid.
-      const width3d = 0.05 + ((index * 5) % 3) * 0.008;
-      const height3d = 0.075 + ((index * 3) % 4) * 0.022;
+      const width3d = 0.05 + (seed % 3) * 0.008;
+      const height3d = 0.075 + ((seed >> 4) % 4) * 0.022;
 
       const mesh = new THREE.Mesh(
         this.box(width3d, height3d, width3d, 0.008),
@@ -541,13 +600,14 @@ export class FridgeScene {
       mesh.position.set(
         -width / 2 + 0.075 + slot * 0.11,
         shelfY + height3d / 2 + 0.008,
-        -depth / 2 + ((index % 3) - 1) * 0.06,
+        -depth / 2 + (((seed >> 2) % 3) - 1) * 0.06,
       );
       cavity.add(mesh);
     });
   }
 
   setOpenPanel(panelId: string | null) {
+    this.openPanelId = panelId;
     for (const panel of this.panels) panel.target = panel.id === panelId ? 1 : 0;
     this.needsRender = true;
   }
@@ -586,6 +646,13 @@ export class FridgeScene {
 
   private clearRoot() {
     for (const child of [...this.root.children]) this.root.remove(child);
+    // Removing a mesh from the scene does not free its GPU memory, and the
+    // model is rebuilt whenever the contents change — so every added item used
+    // to leak a model's worth of geometry.
+    for (const geometry of this.modelGeometries) geometry.dispose();
+    for (const material of this.modelMaterials) material.dispose();
+    this.modelGeometries = [];
+    this.modelMaterials = [];
     this.panels = [];
   }
 
@@ -612,12 +679,7 @@ export class FridgeScene {
         animating = true;
       }
 
-      if (panel.opens === 'door') {
-        const direction = panel.hinge === 'left' ? -1 : 1;
-        panel.pivot.rotation.y = direction * DOOR_OPEN_RADIANS * panel.open;
-      } else {
-        panel.pivot.position.z = DRAWER_TRAVEL * panel.open;
-      }
+      this.applyPanelTransform(panel);
 
       // The cavity light and the accent strip brighten as it opens. Hover only
       // brightens the accent — nothing moves, so nothing can flicker.
@@ -636,7 +698,9 @@ export class FridgeScene {
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.frame);
+    this.clearRoot();
     for (const geometry of this.geometries) geometry.dispose();
+    for (const extra of this.extras) extra.dispose();
     this.materials.dispose();
     this.environment?.dispose();
     this.renderer.dispose();
