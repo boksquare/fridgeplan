@@ -39,8 +39,14 @@ reconcile. You can add your own recipes with an optional photo; those are
 private to your household. Recipe sources and AI providers are both swappable
 adapters behind one interface.
 
-**Phase 3** is the full visual and animation pass, expiry-flag polish, guest
-mode for hosted instances, and the self-host docs.
+**Phase 3 (the fridge itself)** — the appliance is drawn in CSS 3D: a cabinet
+with real side and top faces, doors that swing out on their own hinge with
+spring physics, drawers that travel towards you, the light coming on inside,
+and your items shown on the shelves and in the drawer trays. Handles meet in
+the middle the way they do on a French-door or side-by-side unit, and the
+cabinet turns towards whichever door you open so you can see in. It respects
+`prefers-reduced-motion`, works by keyboard, and fits a 390px screen without
+horizontal scroll. Hosted instances also get browser-only guest mode.
 
 ## Stack
 
@@ -107,6 +113,30 @@ A few things worth knowing:
 - Auth.js needs `AUTH_TRUST_HOST=true` whenever the app runs behind a proxy or
   in a container.
 
+## Deployment modes
+
+Which mode an instance runs in is chosen once, at `/setup`, and stored in the
+database — not in an env var.
+
+| | Personal self-host | Public hosted |
+| --- | --- | --- |
+| Accounts | none; one implicit user | email + password (OAuth is a drop-in later) |
+| Sharing | — | households share fridges and private recipes |
+| Guest use | not applicable | browser-only guest mode, see below |
+| AI provider | the user picks it in settings | the operator sets it in config; locked for users |
+| Claude Code adapter | available | refused |
+
+### Guest mode (hosted only)
+
+A visitor without an account gets a fridge that lives entirely in their
+browser's `localStorage`. Nothing about it reaches the database: no rows, no
+cache, no identity. Recipe lookups post the inventory to a stateless proxy
+(`/api/guest/recipes`) that queries the sources in memory and returns whole
+recipes, because there is no cached row for a guest to re-open later. Clearing
+browser data clears the fridge, and there is no server-side copy to recover.
+Cook-confirmation and AI substitutions need an account, since both depend on
+persistent state.
+
 ## Recipes and AI
 
 Recipe sources are adapters behind one interface (`src/lib/recipes/`), so a
@@ -144,6 +174,44 @@ single row written by first-run setup.
 Recipe data and photos come from [TheMealDB](https://www.themealdb.com/) and,
 when an operator configures it, [Spoonacular](https://spoonacular.com/food-api).
 Spoonacular results are only ever cached for up to an hour, per their terms.
+
+## Self-hosting notes
+
+**Backups.** Everything durable is in Postgres, plus the uploads volume for
+private-recipe photos. A `pg_dump` of the database and a copy of the volume is
+a complete backup:
+
+```bash
+docker compose exec db pg_dump -U fridgeplan fridgeplan > fridgeplan.sql
+docker run --rm -v fridgeplan_uploads:/data -v "$PWD:/backup" alpine \
+  tar czf /backup/uploads.tar.gz -C /data .
+```
+
+**Upgrading.** Pull, rebuild, and restart — the entrypoint applies any new
+migrations before the app starts serving:
+
+```bash
+git pull && docker compose up --build -d
+```
+
+**Secrets.** `AUTH_SECRET` signs sessions and, unless `AI_ENCRYPTION_KEY` is
+set, also derives the key that encrypts stored AI provider keys. Changing it
+signs everyone out and makes stored provider keys unreadable, so set it once
+and keep it.
+
+**Reverse proxies and TLS** are deliberately out of scope: compose publishes a
+plain HTTP port and whatever sits in front of it is your choice. Set
+`AUTH_TRUST_HOST=true` (compose does) and point `NEXTAUTH_URL` at the public
+URL so auth callbacks resolve.
+
+**Recipe sources.** TheMealDB needs no key. If you configure Spoonacular,
+remember that its terms cap caching at an hour and require deleting what you
+obtained if you stop using it — `npm run purge:provider spoonacular` does that.
+
+**Not built yet:** email/push notifications for expiry, an admin panel for
+hosted operators to change the AI provider without editing config, and
+automatic unit reconciliation when a recipe's units do not match what is in the
+fridge (you are asked to confirm instead).
 
 ## License
 

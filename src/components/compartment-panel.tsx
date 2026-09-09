@@ -16,9 +16,11 @@ function unitLabel(item: ClientItem) {
 export function CompartmentPanel({
   compartment,
   onChanged,
+  onClose,
 }: {
   compartment: ClientCompartment;
   onChanged: () => void;
+  onClose?: () => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -57,10 +59,21 @@ export function CompartmentPanel({
     >
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold">{compartment.label}</h2>
-        <span className="text-sm text-slate-500 dark:text-slate-400">
-          {compartment.items.length === 0
-            ? 'Empty'
-            : `${compartment.items.length} item${compartment.items.length === 1 ? '' : 's'}`}
+        <span className="flex items-center gap-3">
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            {compartment.items.length === 0
+              ? 'Empty'
+              : `${compartment.items.length} item${compartment.items.length === 1 ? '' : 's'}`}
+          </span>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            >
+              Close {compartment.label.toLowerCase()}
+            </button>
+          ) : null}
         </span>
       </header>
 

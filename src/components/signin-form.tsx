@@ -58,6 +58,17 @@ export function SignInForm() {
       >
         {submitting ? 'Signing in…' : 'Sign in'}
       </button>
+
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        <a href="/register" className="underline">
+          Create an account
+        </a>{' '}
+        or{' '}
+        <a href="/guest" className="underline">
+          try it without one
+        </a>
+        .
+      </p>
     </form>
   );
 }

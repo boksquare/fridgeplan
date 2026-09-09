@@ -103,3 +103,46 @@ export function fridgeLayout<T extends LayoutCompartment>(
 export function isFreezerCompartment(type: CompartmentType): boolean {
   return type === CompartmentType.freezer || type === CompartmentType.freezer_door;
 }
+
+export type OpenStyle = 'door' | 'drawer';
+export type Hinge = 'left' | 'right';
+
+/**
+ * How a compartment opens, which is a property of the fridge as a whole rather
+ * than of the compartment type alone: a French door's freezer pulls out as a
+ * drawer, while a side-by-side's swings open on a hinge.
+ */
+export function compartmentOpensAs(
+  fridgeType: FridgeType,
+  compartmentType: CompartmentType,
+): OpenStyle {
+  switch (compartmentType) {
+    case CompartmentType.middle_drawer:
+    case CompartmentType.crisper_drawer:
+    case CompartmentType.deli_drawer:
+      return 'drawer';
+    case CompartmentType.freezer:
+      return fridgeType === FridgeType.french_door || fridgeType === FridgeType.bottom_freezer
+        ? 'drawer'
+        : 'door';
+    default:
+      return 'door';
+  }
+}
+
+/**
+ * Which edge a door is hinged on, so handles meet in the middle the way they do
+ * on a real appliance: two doors sharing a band are a French pair and open away
+ * from each other, and in a two-column cabinet each column's doors hinge on
+ * that column's outer edge.
+ */
+export function hingeFor(
+  indexInCell: number,
+  cellSize: number,
+  columnIndex = 0,
+  columnCount = 1,
+): Hinge {
+  if (cellSize >= 2) return indexInCell === 0 ? 'left' : 'right';
+  if (columnCount >= 2) return columnIndex === 0 ? 'left' : 'right';
+  return 'left';
+}

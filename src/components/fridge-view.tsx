@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { worstExpiry, type ClientFridge } from '@/lib/serialize';
+import { expiryStatus } from '@/lib/expiry';
+import { UNITS, worstExpiry, type ClientFridge } from '@/lib/serialize';
 import { FridgeIllustration } from '@/components/fridge-illustration';
 import { CompartmentPanel } from '@/components/compartment-panel';
 
@@ -26,6 +27,17 @@ export function FridgeView({ fridge, otherFridges }: {
     position: compartment.position,
     itemCount: compartment.items.length,
     worstExpiry: worstExpiry(compartment.items),
+    // What is actually on the shelves, shown once the door is open.
+    itemLabels: compartment.items.map((item) => ({
+      id: item.id,
+      label:
+        item.unit === 'count'
+          ? `${item.quantity}× ${item.ingredientName}`
+          : `${item.ingredientName} ${item.quantity}${
+              UNITS.find((unit) => unit.value === item.unit)?.label ?? item.unit
+            }`,
+      expiry: expiryStatus(item.expirationDate ? new Date(item.expirationDate) : null),
+    })),
   }));
 
   return (
@@ -51,7 +63,7 @@ export function FridgeView({ fridge, otherFridges }: {
         </nav>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         <div className="flex flex-col gap-3">
           <FridgeIllustration
             type={fridge.type}
@@ -62,10 +74,29 @@ export function FridgeView({ fridge, otherFridges }: {
           <p className="text-center text-xs text-slate-500 dark:text-slate-400">
             Pick a door or drawer to see what is inside.
           </p>
+
+          {/* Only shown when something is actually flagged. */}
+          {compartments.some((compartment) => compartment.worstExpiry === 'soon') ||
+          compartments.some((compartment) => compartment.worstExpiry === 'expired') ? (
+            <ul className="flex flex-wrap justify-center gap-3 text-xs text-slate-600 dark:text-slate-400">
+              <li className="flex items-center gap-1.5">
+                <span className="inline-block size-2.5 rounded-full border border-amber-600 bg-amber-200" />
+                Use soon (within 3 days)
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="inline-block size-2.5 rounded-full border border-red-600 bg-red-200" />
+                Expired
+              </li>
+            </ul>
+          ) : null}
         </div>
 
         {selected ? (
-          <CompartmentPanel compartment={selected} onChanged={() => router.refresh()} />
+          <CompartmentPanel
+            compartment={selected}
+            onChanged={() => router.refresh()}
+            onClose={() => setSelectedId(null)}
+          />
         ) : (
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Nothing open yet. Choose a compartment on the left to add or check items.
