@@ -141,8 +141,8 @@ cache, no identity. Recipe lookups post the inventory to a stateless proxy
 (`/api/guest/recipes`) that queries the sources in memory and returns whole
 recipes, because there is no cached row for a guest to re-open later. Clearing
 browser data clears the fridge, and there is no server-side copy to recover.
-Cook-confirmation and AI substitutions need an account, since both depend on
-persistent state.
+Cook-confirmation, AI substitutions and receipt scanning need an account, since
+they depend on persistent state or on spending the instance's AI quota.
 
 ## Entering inventory
 
@@ -181,6 +181,23 @@ Spoonacular's terms allow caching for at most an hour and require deleting
 everything obtained from them if you stop using the API. Rows from it carry an
 expiry that is swept on every search, and `npm run purge:provider spoonacular`
 removes the lot.
+
+### Scanning a receipt
+
+"Scan a receipt" beside any compartment photographs a grocery receipt and turns
+it into inventory. The photo is shrunk in the browser, sent once, and never
+written to disk, stored in the database or logged; what comes back is a **draft**
+you check line by line, with the printed text shown beside each reading, so a
+misread abbreviation costs a correction rather than a wrong fridge. Each line
+carries its own amount, unit and destination compartment, unticking one leaves it
+out, and the whole batch is added in one transaction — a bad line cannot leave
+half a receipt in the fridge. Unrecognised names are flagged as new ingredients.
+Limited to 20 scans an hour per user.
+
+This needs a provider that accepts images. The Claude Code CLI cannot be given
+one, and NVIDIA NIM only can when its configured model is a vision model;
+Settings → Diagnostics reports which you have, and the feature refuses up front
+rather than failing mid-scan.
 
 AI providers work the same way (`src/lib/ai/`): NVIDIA NIM, Google Gemini, any
 OpenAI-compatible endpoint, the Anthropic API, and — on personal self-host

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { UNITS, type ClientCompartment, type ClientItem } from '@/lib/serialize';
 import { ExpiryBadge } from '@/components/expiry-badge';
 import { InventoryItemForm } from '@/components/inventory-item-form';
+import { ReceiptScanner } from '@/components/receipt-scanner';
 
 function unitLabel(item: ClientItem) {
   const unit = UNITS.find((entry) => entry.value === item.unit);
@@ -19,10 +20,13 @@ export function CompartmentPanel({
   onClose,
   siblings,
   onSelectSibling,
+  allCompartments,
 }: {
   compartment: ClientCompartment;
   onChanged: () => void;
   onClose?: () => void;
+  /** Every compartment in this fridge, so a scanned receipt can be split up. */
+  allCompartments?: ClientCompartment[];
   /** The other storage behind the same door, e.g. shelves and door bins. */
   siblings?: { id: string; label: string; itemCount: number }[];
   onSelectSibling?: (compartmentId: string) => void;
@@ -192,13 +196,22 @@ export function CompartmentPanel({
           onCancel={() => setAdding(false)}
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="w-fit rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900"
-        >
-          Add an item
-        </button>
+        <div className="flex flex-wrap items-start gap-2">
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="w-fit rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900"
+          >
+            Add an item
+          </button>
+          {allCompartments && allCompartments.length > 0 ? (
+            <ReceiptScanner
+              compartments={allCompartments}
+              defaultCompartmentId={compartment.id}
+              onAdded={onChanged}
+            />
+          ) : null}
+        </div>
       )}
     </motion.section>
   );

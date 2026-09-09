@@ -70,6 +70,12 @@ export async function suggestUnit(input: {
   ingredientName: string;
   userId?: string;
   system: UnitSystem;
+  /**
+   * Set false to skip step 4. A caller resolving many names at once (a scanned
+   * receipt) would otherwise spend one call per line before showing anything,
+   * and its user is reviewing every unit on screen regardless.
+   */
+  allowAI?: boolean;
 }): Promise<UnitSuggestion> {
   const name = input.ingredientName.trim();
   if (!name) return { unit: Unit.count, source: 'fallback' };
@@ -124,7 +130,12 @@ export async function suggestUnit(input: {
   //    and asking anyway would mean a call per keystroke and a dictionary full
   //    of typos. Such a name gets the table or the fallback now, and can be
   //    resolved properly once saving it creates the row.
-  if (ingredient && input.userId && normalizeIngredientName(name).length > 2) {
+  if (
+    ingredient &&
+    input.userId &&
+    input.allowAI !== false &&
+    normalizeIngredientName(name).length > 2
+  ) {
     const answered = await askAI(name, input.userId);
     if (answered) {
       await prisma.ingredient.update({

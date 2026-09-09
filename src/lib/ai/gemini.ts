@@ -5,6 +5,7 @@ export const geminiProvider: AIProvider = {
   id: 'gemini',
   label: 'Google Gemini',
   needsApiKey: true,
+  supportsVision: true,
   defaultModel: 'gemini-2.0-flash',
 
   async chat(request, config) {
@@ -19,7 +20,17 @@ export const geminiProvider: AIProvider = {
       headers: { 'content-type': 'application/json', 'x-goog-api-key': config.apiKey ?? '' },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: request.system }] },
-        contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: request.prompt },
+              ...(request.images ?? []).map((image) => ({
+                inline_data: { mime_type: image.mediaType, data: image.base64 },
+              })),
+            ],
+          },
+        ],
         generationConfig: { maxOutputTokens: request.maxTokens ?? 800, temperature: 0.2 },
       }),
     });

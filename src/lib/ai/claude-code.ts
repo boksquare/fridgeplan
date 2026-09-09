@@ -21,9 +21,19 @@ export const claudeCodeProvider: AIProvider = {
   label: 'Claude Code (local CLI)',
   selfHostOnly: true,
   needsApiKey: false,
+  // The CLI is driven with a text prompt; there is no way to hand it an image
+  // inline, so features that need vision refuse this provider up front.
+  supportsVision: false,
   defaultModel: 'default',
 
   async chat(request, config) {
+    if (request.images && request.images.length > 0) {
+      throw new AIProviderError(
+        'claude_code',
+        'The Claude Code CLI cannot be given an image. Pick an API provider for anything that reads photos.',
+      );
+    }
+
     const binary = config.baseUrl?.trim() || env('CLAUDE_CODE_BIN') || 'claude';
     const args = [
       '-p',

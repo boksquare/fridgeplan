@@ -129,5 +129,24 @@ export async function runDiagnostics(userId?: string): Promise<Check[]> {
     });
   }
 
+  // Receipt scanning needs a provider that accepts images, which is a narrower
+  // thing than a working provider: the local CLI never does, and NVIDIA NIM
+  // only does when the configured model is a vision one. Saying so here saves
+  // a user discovering it from a 503 with a camera in their hand.
+  if (ai.active) {
+    const provider = ai.active.provider;
+    checks.push({
+      name: 'Receipt scanning (vision)',
+      status: provider.supportsVision ? 'ok' : 'warn',
+      detail: provider.supportsVision
+        ? `${provider.label} accepts photos${
+            provider.id === 'nvidia_nim'
+              ? ` — make sure ${ai.active.config.model ?? provider.defaultModel} is a vision model`
+              : ''
+          }`
+        : `${provider.label} cannot be sent images, so receipt scanning is off. Everything else still works.`,
+    });
+  }
+
   return checks;
 }

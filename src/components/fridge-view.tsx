@@ -115,6 +115,7 @@ export function FridgeView({ fridge, otherFridges }: {
               itemCount: compartment.items.length,
             }))}
             onSelectSibling={setShownCompartmentId}
+            allCompartments={fridge.compartments}
           />
         ) : (
           <p className="text-sm text-slate-600 dark:text-slate-400">

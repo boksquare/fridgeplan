@@ -5,6 +5,7 @@ export const anthropicProvider: AIProvider = {
   id: 'anthropic',
   label: 'Anthropic API',
   needsApiKey: true,
+  supportsVision: true,
   defaultModel: 'claude-sonnet-5',
 
   async chat(request, config) {
@@ -22,7 +23,25 @@ export const anthropicProvider: AIProvider = {
           model,
           max_tokens: request.maxTokens ?? 800,
           system: request.system,
-          messages: [{ role: 'user', content: request.prompt }],
+          messages: [
+            {
+              role: 'user',
+              content:
+                request.images && request.images.length > 0
+                  ? [
+                      ...request.images.map((image) => ({
+                        type: 'image',
+                        source: {
+                          type: 'base64',
+                          media_type: image.mediaType,
+                          data: image.base64,
+                        },
+                      })),
+                      { type: 'text', text: request.prompt },
+                    ]
+                  : request.prompt,
+            },
+          ],
         }),
       },
     );

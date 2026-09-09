@@ -26,7 +26,19 @@ export async function chatCompletions(
       model,
       messages: [
         { role: 'system', content: request.system },
-        { role: 'user', content: request.prompt },
+        {
+          role: 'user',
+          content:
+            request.images && request.images.length > 0
+              ? [
+                  { type: 'text', text: request.prompt },
+                  ...request.images.map((image) => ({
+                    type: 'image_url',
+                    image_url: { url: `data:${image.mediaType};base64,${image.base64}` },
+                  })),
+                ]
+              : request.prompt,
+        },
       ],
       max_tokens: request.maxTokens ?? 800,
       temperature: 0.2,
@@ -50,6 +62,7 @@ export const openAICompatibleProvider: AIProvider = {
   id: 'openai_compatible',
   label: 'OpenAI-compatible API',
   needsApiKey: true,
+  supportsVision: true,
   defaultModel: 'gpt-4o-mini',
   chat: (request, config) =>
     chatCompletions(
@@ -65,6 +78,8 @@ export const nvidiaNimProvider: AIProvider = {
   id: 'nvidia_nim',
   label: 'NVIDIA NIM',
   needsApiKey: true,
+  // Only true of a vision model, e.g. meta/llama-3.2-11b-vision-instruct.
+  supportsVision: true,
   defaultModel: 'meta/llama-3.1-70b-instruct',
   chat: (request, config) =>
     chatCompletions(
