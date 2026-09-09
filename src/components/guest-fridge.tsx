@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import Link from 'next/link';
 import { Unit } from '@/generated/prisma/enums';
 import { expiryStatus, expiryLabel } from '@/lib/expiry';
-import { UNITS, toDateInputValue } from '@/lib/serialize';
+import { UNITS, formatAmount, toDateInputValue } from '@/lib/serialize';
 import {
   EMPTY_SHAPE,
   FridgeShapePicker,
@@ -86,9 +86,7 @@ export function GuestFridge() {
           label:
             item.unit === Unit.count
               ? `${item.quantity}× ${item.ingredientName}`
-              : `${item.ingredientName} ${item.quantity}${
-                  UNITS.find((unit) => unit.value === item.unit)?.label ?? item.unit
-                }`,
+              : `${item.ingredientName} ${formatAmount(item.quantity, item.unit)}`,
           expiry: expiryStatus(item.expirationDate ? new Date(item.expirationDate) : null),
         })),
       })),
@@ -470,7 +468,7 @@ function GuestCompartmentPanel({
                 <span>
                   <span className="font-medium">{item.ingredientName}</span>{' '}
                   <span className="text-slate-500 dark:text-slate-400">
-                    {item.quantity} {item.unit === Unit.count ? '' : item.unit}
+                    {formatAmount(item.quantity, item.unit)}
                   </span>
                 </span>
                 {label ? <span className="text-xs text-amber-700 dark:text-amber-300">{label}</span> : null}

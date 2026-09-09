@@ -164,8 +164,23 @@ A suggestion only fills a unit you have not set yourself: pick one by hand and
 it stops overriding you. Which system it leans towards is per-user, under
 Settings, and defaults to imperial.
 
-Note the gap: the unit list has no gallon, pint or fluid ounce, so imperial
-liquids land on `cup`.
+### Units
+
+Thirteen units, in three families: mass (g, kg, oz, lb), volume (ml, l, tsp,
+tbsp, fl oz, cup, pint, gallon) and `count` for anything bought whole. The
+prefill table uses the size a shop actually sells something in, so milk is a
+gallon, cream a pint, and a bottle of stock fluid ounces.
+
+**The volume units are US customary**, and the pickers say so, because the
+difference is not small: a US pint is 473 ml against a UK pint's 568 ml, and a
+US gallon 3.79 l against 4.55 l. A cup here is 236.6 ml, not the metric 250 ml.
+The "imperial" setting means US customary throughout.
+
+Conversion works within a family and only within a family
+(`src/lib/recipes/units.ts`): every unit knows its size in grams or millilitres,
+so a recipe asking for a cup of milk decrements a gallon correctly. Grams to
+millilitres would need the ingredient's density, so it is refused rather than
+guessed, and you are asked for the amount instead.
 
 ## Recipes and AI
 

@@ -2,15 +2,14 @@
 
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { UNITS, type ClientCompartment, type ClientItem } from '@/lib/serialize';
+import { formatAmount, type ClientCompartment, type ClientItem } from '@/lib/serialize';
 import { ExpiryBadge } from '@/components/expiry-badge';
 import { InventoryItemForm } from '@/components/inventory-item-form';
 import { ReceiptScanner } from '@/components/receipt-scanner';
 
 function unitLabel(item: ClientItem) {
-  const unit = UNITS.find((entry) => entry.value === item.unit);
   if (item.unit === 'count') return `${item.quantity}×`;
-  return `${item.quantity} ${unit?.label ?? item.unit}`;
+  return formatAmount(item.quantity, item.unit);
 }
 
 /** What is inside the compartment you just opened, and how to change it. */

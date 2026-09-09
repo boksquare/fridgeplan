@@ -8,18 +8,38 @@ import { expiryStatus, type ExpiryStatus } from '@/lib/expiry';
  * inputs and the API expect.
  */
 
-export const UNITS: { value: Unit; label: string }[] = [
-  { value: Unit.g, label: 'g' },
-  { value: Unit.kg, label: 'kg' },
-  { value: Unit.ml, label: 'ml' },
-  { value: Unit.l, label: 'l' },
-  { value: Unit.cup, label: 'cup' },
-  { value: Unit.tbsp, label: 'tbsp' },
-  { value: Unit.tsp, label: 'tsp' },
-  { value: Unit.oz, label: 'oz' },
-  { value: Unit.lb, label: 'lb' },
-  { value: Unit.count, label: 'whole / count' },
+/**
+ * Every unit, grouped by what it measures.
+ *
+ * Two labels, because the two jobs differ. `label` is for a picker, where the
+ * US-customary volumes are marked as such deliberately: a pint is 473 ml here
+ * and 568 ml in the UK, and a cup is 236.6 ml against a metric 250 ml, so an
+ * unqualified "pint" leaves the user to guess which one they chose. `short` is
+ * for reading an amount back, where the choice has already been made and
+ * "2 gallon (US)" is just noise.
+ */
+export const UNITS: { value: Unit; label: string; short: string }[] = [
+  { value: Unit.g, label: 'g', short: 'g' },
+  { value: Unit.kg, label: 'kg', short: 'kg' },
+  { value: Unit.oz, label: 'oz', short: 'oz' },
+  { value: Unit.lb, label: 'lb', short: 'lb' },
+  { value: Unit.ml, label: 'ml', short: 'ml' },
+  { value: Unit.l, label: 'l', short: 'l' },
+  { value: Unit.tsp, label: 'tsp', short: 'tsp' },
+  { value: Unit.tbsp, label: 'tbsp', short: 'tbsp' },
+  { value: Unit.floz, label: 'fl oz (US)', short: 'fl oz' },
+  { value: Unit.cup, label: 'cup (US)', short: 'cup' },
+  { value: Unit.pt, label: 'pint (US)', short: 'pt' },
+  { value: Unit.gal, label: 'gallon (US)', short: 'gal' },
+  { value: Unit.count, label: 'whole / count', short: '' },
 ];
+
+/** How to read an amount back to the user, e.g. "2 gal" or "3" for a count. */
+export function formatAmount(quantity: number, unit: Unit): string {
+  const found = UNITS.find((entry) => entry.value === unit);
+  const short = found ? found.short : unit;
+  return short ? `${quantity} ${short}` : `${quantity}`;
+}
 
 export type ClientItem = {
   id: string;

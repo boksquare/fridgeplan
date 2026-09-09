@@ -10,14 +10,21 @@ import { normalizeIngredientName, singularize } from '@/lib/recipes/measure';
  * asked about names that are not here, and its answer is cached on the
  * ingredient row.
  *
- * Note the gap: the unit set has no gallon, pint or fluid ounce, so imperial
- * liquids land on `cup`, which is the closest thing available.
+ * Imperial liquids use the size the shop actually sells them in — milk by the
+ * gallon, cream by the pint, stock by the fluid ounce — rather than the cup they
+ * all used to collapse onto before those units existed.
  */
 type UnitPair = { imperial: Unit; metric: Unit };
 
 const BY_WEIGHT_LARGE: UnitPair = { imperial: Unit.lb, metric: Unit.kg };
 const BY_WEIGHT_SMALL: UnitPair = { imperial: Unit.oz, metric: Unit.g };
-const BY_VOLUME: UnitPair = { imperial: Unit.cup, metric: Unit.l };
+/** Bought by the jug: milk, water, juice. */
+const BY_VOLUME_JUG: UnitPair = { imperial: Unit.gal, metric: Unit.l };
+/** Bought by the carton, which in the US is a pint or a half-pint. */
+const BY_VOLUME_CARTON: UnitPair = { imperial: Unit.pt, metric: Unit.ml };
+/** Bought by the bottle or can, whose label reads in fluid ounces. */
+const BY_VOLUME_BOTTLE: UnitPair = { imperial: Unit.floz, metric: Unit.ml };
+/** Measured out by the spoon rather than bought by volume. */
 const BY_VOLUME_SMALL: UnitPair = { imperial: Unit.tbsp, metric: Unit.ml };
 const BY_COUNT: UnitPair = { imperial: Unit.count, metric: Unit.count };
 
@@ -46,9 +53,9 @@ const NAMES: Record<string, UnitPair> = {
   shrimp: BY_WEIGHT_SMALL,
 
   // Dairy
-  milk: BY_VOLUME,
-  cream: BY_VOLUME,
-  'double cream': BY_VOLUME,
+  milk: BY_VOLUME_JUG,
+  cream: BY_VOLUME_CARTON,
+  'double cream': BY_VOLUME_CARTON,
   'sour cream': BY_WEIGHT_SMALL,
   yoghurt: BY_WEIGHT_SMALL,
   yogurt: BY_WEIGHT_SMALL,
@@ -80,13 +87,13 @@ const NAMES: Record<string, UnitPair> = {
   breadcrumb: BY_WEIGHT_SMALL,
 
   // Liquids and condiments
-  water: BY_VOLUME,
-  stock: BY_VOLUME,
-  broth: BY_VOLUME,
-  juice: BY_VOLUME,
-  'orange juice': BY_VOLUME,
-  wine: BY_VOLUME,
-  beer: BY_VOLUME,
+  water: BY_VOLUME_JUG,
+  stock: BY_VOLUME_BOTTLE,
+  broth: BY_VOLUME_BOTTLE,
+  juice: BY_VOLUME_JUG,
+  'orange juice': BY_VOLUME_JUG,
+  wine: BY_VOLUME_BOTTLE,
+  beer: BY_VOLUME_BOTTLE,
   'olive oil': BY_VOLUME_SMALL,
   oil: BY_VOLUME_SMALL,
   'vegetable oil': BY_VOLUME_SMALL,
@@ -155,9 +162,9 @@ const KEYWORDS: [string, UnitPair][] = [
   ['cheese', BY_WEIGHT_SMALL],
   ['yoghurt', BY_WEIGHT_SMALL],
   ['yogurt', BY_WEIGHT_SMALL],
-  ['milk', BY_VOLUME],
-  ['cream', BY_VOLUME],
-  ['juice', BY_VOLUME],
+  ['milk', BY_VOLUME_JUG],
+  ['cream', BY_VOLUME_CARTON],
+  ['juice', BY_VOLUME_JUG],
   ['oil', BY_VOLUME_SMALL],
   ['sauce', BY_VOLUME_SMALL],
   ['syrup', BY_VOLUME_SMALL],

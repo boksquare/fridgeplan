@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Unit } from '@/generated/prisma/enums';
 import { convertAmount } from '@/lib/recipes/units';
-import { UNITS } from '@/lib/serialize';
+import { UNITS, formatAmount } from '@/lib/serialize';
 import { Dialog } from '@/components/dialog';
 
 export type CookCandidate = {
@@ -180,7 +180,7 @@ export function CookPanel({
                   ))}
                 </select>
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {line.stocked} {line.unit} in stock
+                  {formatAmount(line.stocked, line.unit)} in stock
                   {line.needsConfirmation ? ' · amount needs confirming' : ''}
                 </span>
               </li>

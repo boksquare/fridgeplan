@@ -41,9 +41,10 @@ const SYSTEM = `You map a grocery item to the unit a shopper would buy it in.
 Answer with JSON only, no prose:
 {"imperial":"<unit>","metric":"<unit>"}
 
-Each unit must be exactly one of: g, kg, ml, l, cup, tbsp, tsp, oz, lb, count.
+Each unit must be exactly one of: g, kg, ml, l, tsp, tbsp, floz, cup, pt, gal, oz, lb, count.
 Use "count" for anything bought as whole pieces (eggs, onions, a loaf).
-There is no gallon or fluid ounce available: use cup for imperial liquids.`;
+Volumes are US customary: milk by the "gal", cream by the "pt", a bottle or can
+by "floz". Use "oz" only for a weight, never for a liquid.`;
 
 async function askAI(name: string, userId: string): Promise<{ imperial: Unit; metric: Unit } | null> {
   try {

@@ -144,9 +144,14 @@ enum Unit {
   kg
   ml
   l
-  cup
-  tbsp
+  // Volume, US customary. A US pint is 473ml and a UK one 568ml, so the labels
+  // shown in the app say "US" rather than leaving it to be guessed.
   tsp
+  tbsp
+  floz
+  cup
+  pt
+  gal
   oz
   lb
   count

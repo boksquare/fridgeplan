@@ -35,8 +35,8 @@ const SYSTEM = `You read a photograph of a grocery receipt and list the food and
 Rules:
 - Expand the shop's abbreviations into plain ingredient names: "GRND BF 80/20" is "Ground beef", "MLK 2% GAL" is "Milk", "BNLS SKNLS CHKN BRST" is "Chicken breast".
 - One entry per purchased item. Skip anything that is not food or drink: totals, subtotals, tax, discounts, loyalty lines, bags, cleaning products, the shop's name.
-- Include quantity and unit only when the receipt shows them. A weight like "1.02 LB" is quantity 1.02 unit "lb"; "2 @ 3.49" is quantity 2 unit "count". If no amount is printed, use null for both.
-- unit must be one of: g, kg, ml, l, cup, tbsp, tsp, oz, lb, count — or null. There is no gallon: a gallon of milk is quantity 1, unit null, and the user will set it.
+- Include quantity and unit only when the receipt shows them. A weight like "1.02 LB" is quantity 1.02 unit "lb"; "2 @ 3.49" is quantity 2 unit "count"; "MLK 2% GAL" is quantity 1 unit "gal"; "SRIRACHA 17OZ" on a bottle is quantity 17 unit "floz". If no amount is printed, use null for both.
+- unit must be one of: g, kg, ml, l, tsp, tbsp, floz, cup, pt, gal, oz, lb, count — or null. Volumes are US customary. Use "oz" for a weight and "floz" for a liquid.
 - Copy the line as printed into "raw", so the reading can be checked.
 - If part of the receipt is unreadable, say so in "note" rather than guessing.
 

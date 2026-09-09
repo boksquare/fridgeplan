@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { expiryStatus } from '@/lib/expiry';
-import { UNITS, worstExpiry, type ClientFridge } from '@/lib/serialize';
+import { formatAmount, worstExpiry, type ClientFridge } from '@/lib/serialize';
 import { Fridge3DIsland } from '@/components/fridge-3d-island';
 import { CompartmentPanel } from '@/components/compartment-panel';
 
@@ -46,9 +46,7 @@ export function FridgeView({ fridge, otherFridges }: {
       label:
         item.unit === 'count'
           ? `${item.quantity}× ${item.ingredientName}`
-          : `${item.ingredientName} ${item.quantity}${
-              UNITS.find((unit) => unit.value === item.unit)?.label ?? item.unit
-            }`,
+          : `${item.ingredientName} ${formatAmount(item.quantity, item.unit)}`,
       expiry: expiryStatus(item.expirationDate ? new Date(item.expirationDate) : null),
     })),
   }));
