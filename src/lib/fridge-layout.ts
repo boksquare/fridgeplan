@@ -1,13 +1,23 @@
 import { CompartmentType, FridgeType } from '@/generated/prisma/enums';
 
 /**
- * Turns a fridge's compartments into a visual layout so the illustration reads
- * as that real fridge type at a glance: a column is a full-height section, a
- * cell is a horizontal band, and a cell holding two compartments is a
- * side-by-side pair (French doors, or a compartment and its door shelves).
+ * Turns a fridge's storage locations into the panels a real appliance actually
+ * has, because the two are not the same thing: door bins and crisper drawers
+ * live *behind* a door, they are not doors of their own. A top-freezer has one
+ * full-width fridge door, a side-by-side has two full-height doors, and a
+ * French door has a pair of equal doors above its drawers.
  *
- * Pure and client-safe — the config builder previews layouts before anything
- * is saved.
+ * Proportions come from the capacity split of a common model of each type,
+ * which maps to panel size because the compartments share the cabinet's width
+ * and depth:
+ *
+ * - French door — Samsung RF28R7201SR, 15.9 cu ft fresh / 8.3 freezer → 66/34
+ * - Top freezer — GE GTS18GTHWW, 13.51 / 4.02 → 77/23
+ * - Bottom freezer — Whirlpool WRB322DMBM, 15.65 / 6.45 → 71/29
+ * - Side by side — Whirlpool WRS325SDHZ, 15.44 / 9.11 → 63/37 (by width)
+ *
+ * Pure and client-safe: the config builder previews layouts before anything is
+ * saved.
  */
 
 export type LayoutCompartment = {
@@ -17,86 +27,210 @@ export type LayoutCompartment = {
   position: number;
 };
 
-export type LayoutCell<T extends LayoutCompartment> = { grow: number; compartments: T[] };
-export type LayoutColumn<T extends LayoutCompartment> = { grow: number; cells: LayoutCell<T>[] };
+export type OpenStyle = 'door' | 'drawer';
+export type Hinge = 'left' | 'right';
 
-function pick<T extends LayoutCompartment>(pool: T[], type: CompartmentType): T[] {
-  const taken = pool.filter((compartment) => compartment.type === type);
+/** One physical door or drawer front, and the storage behind it. */
+export type FridgePanel<T extends LayoutCompartment> = {
+  id: string;
+  label: string;
+  opens: OpenStyle;
+  hinge: Hinge;
+  /** Share of its column's height. */
+  grow: number;
+  compartments: T[];
+};
+
+export type FridgeColumn<T extends LayoutCompartment> = {
+  /** Share of the cabinet's width. */
+  grow: number;
+  panels: FridgePanel<T>[];
+};
+
+function take<T extends LayoutCompartment>(pool: T[], ...types: CompartmentType[]): T[] {
+  const taken = pool.filter((compartment) => types.includes(compartment.type));
   for (const compartment of taken) pool.splice(pool.indexOf(compartment), 1);
   return taken;
 }
 
-function cell<T extends LayoutCompartment>(grow: number, compartments: (T | undefined)[]) {
-  const present = compartments.filter((compartment): compartment is T => Boolean(compartment));
-  return present.length > 0 ? [{ grow, compartments: present }] : [];
+function panel<T extends LayoutCompartment>(
+  input: Omit<FridgePanel<T>, 'id'> & { id?: string },
+): FridgePanel<T>[] {
+  if (input.compartments.length === 0) return [];
+  return [{ ...input, id: input.id ?? input.compartments[0]!.id }];
 }
 
-export function fridgeLayout<T extends LayoutCompartment>(
+export function fridgePanels<T extends LayoutCompartment>(
   type: FridgeType,
   compartments: T[],
-): LayoutColumn<T>[] {
-  // Copy: pick() consumes the pool as it assigns compartments to cells.
+): FridgeColumn<T>[] {
   const pool = [...compartments].sort((a, b) => a.position - b.position);
 
-  const main = pick(pool, CompartmentType.fridge_main);
-  const fridgeDoor = pick(pool, CompartmentType.fridge_door);
-  const freezers = pick(pool, CompartmentType.freezer);
-  const freezerDoor = pick(pool, CompartmentType.freezer_door);
-  const middles = pick(pool, CompartmentType.middle_drawer);
-  const crispers = pick(pool, CompartmentType.crisper_drawer);
-  const rest = pool;
-
-  const single = (cells: LayoutCell<T>[]): LayoutColumn<T>[] => [{ grow: 1, cells }];
-  const leftovers = rest.flatMap((compartment) => cell(1, [compartment]));
+  // Storage that sits behind the fridge door rather than being a door itself.
+  const fridgeInside = take(
+    pool,
+    CompartmentType.fridge_main,
+    CompartmentType.fridge_door,
+    CompartmentType.crisper_drawer,
+    CompartmentType.deli_drawer,
+  );
+  const freezerInside = take(pool, CompartmentType.freezer_door);
+  const freezers = take(pool, CompartmentType.freezer);
+  const middles = take(pool, CompartmentType.middle_drawer);
+  const leftovers = pool;
 
   switch (type) {
-    case FridgeType.french_door:
-      return single([
-        ...cell(3, [main[0], fridgeDoor[0]]),
-        ...middles.flatMap((drawer) => cell(1, [drawer])),
-        ...crispers.flatMap((drawer) => cell(1, [drawer])),
-        ...freezers.flatMap((drawer) => cell(1.2, [drawer])),
-        ...leftovers,
-      ]);
+    case FridgeType.french_door: {
+      // A pair of equal doors over the drawers. Both open the same fresh-food
+      // cabinet, which is how the appliance works.
+      const middleShare = middles.length * 12;
+      const topShare = Math.max(30, 66 - middles.length * 4);
+      const freezerShare = Math.max(10, 100 - topShare - middleShare);
 
-    case FridgeType.top_freezer:
-      return single([
-        ...cell(1.3, [freezers[0], freezerDoor[0]]),
-        ...cell(3, [main[0], fridgeDoor[0]]),
-        ...crispers.flatMap((drawer) => cell(1, [drawer])),
-        ...freezers.slice(1).flatMap((drawer) => cell(1.2, [drawer])),
-        ...leftovers,
-      ]);
-
-    case FridgeType.bottom_freezer:
-      return single([
-        ...cell(3, [main[0], fridgeDoor[0]]),
-        ...crispers.flatMap((drawer) => cell(1, [drawer])),
-        ...middles.flatMap((drawer) => cell(1, [drawer])),
-        ...freezers.flatMap((drawer) => cell(1.4, [drawer])),
-        ...leftovers,
-      ]);
-
-    case FridgeType.side_by_side:
       return [
         {
-          grow: 2,
-          cells: [...cell(3, [freezers[0]]), ...cell(1, [freezerDoor[0]])],
+          grow: 1,
+          panels: [
+            ...(fridgeInside.length > 0
+              ? [
+                  {
+                    id: `${fridgeInside[0]!.id}-left`,
+                    label: 'Left door',
+                    opens: 'door' as const,
+                    hinge: 'left' as const,
+                    grow: topShare,
+                    compartments: fridgeInside,
+                  },
+                  {
+                    id: `${fridgeInside[0]!.id}-right`,
+                    label: 'Right door',
+                    opens: 'door' as const,
+                    hinge: 'right' as const,
+                    grow: topShare,
+                    compartments: fridgeInside,
+                  },
+                ]
+              : []),
+            ...middles.flatMap((drawer) =>
+              panel({
+                label: drawer.label,
+                opens: 'drawer',
+                hinge: 'left',
+                grow: 12,
+                compartments: [drawer],
+              }),
+            ),
+            ...freezers.flatMap((drawer) =>
+              panel({
+                label: drawer.label,
+                opens: 'drawer',
+                hinge: 'left',
+                grow: freezerShare / freezers.length,
+                compartments: [drawer],
+              }),
+            ),
+            ...leftovers.flatMap((compartment) =>
+              panel({
+                label: compartment.label,
+                opens: 'drawer',
+                hinge: 'left',
+                grow: 12,
+                compartments: [compartment],
+              }),
+            ),
+          ],
         },
+      ];
+    }
+
+    case FridgeType.top_freezer:
+      return [
         {
-          grow: 3,
-          cells: [
-            ...cell(3, [main[0]]),
-            ...cell(1, [fridgeDoor[0]]),
-            ...crispers.flatMap((drawer) => cell(1, [drawer])),
-            ...middles.flatMap((drawer) => cell(1, [drawer])),
-            ...leftovers,
+          grow: 1,
+          panels: [
+            ...panel({
+              label: 'Freezer',
+              opens: 'door',
+              hinge: 'right',
+              grow: 23,
+              compartments: [...freezers, ...freezerInside],
+            }),
+            ...panel({
+              label: 'Fridge',
+              opens: 'door',
+              hinge: 'right',
+              grow: 77,
+              compartments: [...fridgeInside, ...middles, ...leftovers],
+            }),
           ],
         },
       ];
 
+    case FridgeType.bottom_freezer:
+      return [
+        {
+          grow: 1,
+          panels: [
+            ...panel({
+              label: 'Fridge',
+              opens: 'door',
+              hinge: 'right',
+              grow: 71,
+              compartments: [...fridgeInside, ...middles, ...leftovers],
+            }),
+            ...freezers.flatMap((drawer, index) =>
+              panel({
+                label: drawer.label,
+                opens: 'drawer',
+                hinge: 'left',
+                grow: 29 / freezers.length,
+                // The freezer door bins belong with the first freezer drawer.
+                compartments: index === 0 ? [drawer, ...freezerInside] : [drawer],
+              }),
+            ),
+          ],
+        },
+      ];
+
+    case FridgeType.side_by_side:
+      return [
+        {
+          grow: 37,
+          panels: panel({
+            label: 'Freezer',
+            opens: 'door',
+            hinge: 'left',
+            grow: 100,
+            compartments: [...freezers, ...freezerInside],
+          }),
+        },
+        {
+          grow: 63,
+          panels: panel({
+            label: 'Fridge',
+            opens: 'door',
+            hinge: 'right',
+            grow: 100,
+            compartments: [...fridgeInside, ...middles, ...leftovers],
+          }),
+        },
+      ];
+
     default:
-      return single(compartments.flatMap((compartment) => cell(1, [compartment])));
+      return [
+        {
+          grow: 1,
+          panels: compartments.flatMap((compartment) =>
+            panel({
+              label: compartment.label,
+              opens: 'door',
+              hinge: 'right',
+              grow: 1,
+              compartments: [compartment],
+            }),
+          ),
+        },
+      ];
   }
 }
 
@@ -104,45 +238,10 @@ export function isFreezerCompartment(type: CompartmentType): boolean {
   return type === CompartmentType.freezer || type === CompartmentType.freezer_door;
 }
 
-export type OpenStyle = 'door' | 'drawer';
-export type Hinge = 'left' | 'right';
-
-/**
- * How a compartment opens, which is a property of the fridge as a whole rather
- * than of the compartment type alone: a French door's freezer pulls out as a
- * drawer, while a side-by-side's swings open on a hinge.
- */
-export function compartmentOpensAs(
-  fridgeType: FridgeType,
-  compartmentType: CompartmentType,
-): OpenStyle {
-  switch (compartmentType) {
-    case CompartmentType.middle_drawer:
-    case CompartmentType.crisper_drawer:
-    case CompartmentType.deli_drawer:
-      return 'drawer';
-    case CompartmentType.freezer:
-      return fridgeType === FridgeType.french_door || fridgeType === FridgeType.bottom_freezer
-        ? 'drawer'
-        : 'door';
-    default:
-      return 'door';
-  }
-}
-
-/**
- * Which edge a door is hinged on, so handles meet in the middle the way they do
- * on a real appliance: two doors sharing a band are a French pair and open away
- * from each other, and in a two-column cabinet each column's doors hinge on
- * that column's outer edge.
- */
-export function hingeFor(
-  indexInCell: number,
-  cellSize: number,
-  columnIndex = 0,
-  columnCount = 1,
-): Hinge {
-  if (cellSize >= 2) return indexInCell === 0 ? 'left' : 'right';
-  if (columnCount >= 2) return columnIndex === 0 ? 'left' : 'right';
-  return 'left';
+/** True when everything behind this panel is frozen storage. */
+export function isFreezerPanel<T extends LayoutCompartment>(panelToCheck: FridgePanel<T>): boolean {
+  return (
+    panelToCheck.compartments.length > 0 &&
+    panelToCheck.compartments.every((compartment) => isFreezerCompartment(compartment.type))
+  );
 }

@@ -46,7 +46,8 @@ export function GuestFridge() {
     getGuestFridgeServerSnapshot,
   );
   const [shape, setShape] = useState<FridgeShape>(EMPTY_SHAPE);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openPanel, setOpenPanel] = useState<{ id: string; compartmentIds: string[] } | null>(null);
+  const [shownCompartmentId, setShownCompartmentId] = useState<string | null>(null);
   const [results, setResults] = useState<GuestResult[] | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -58,7 +59,11 @@ export function GuestFridge() {
     saveGuestFridge(next);
   }
 
-  const selected = fridge?.compartments.find((compartment) => compartment.id === selectedId) ?? null;
+  const behindDoor = (openPanel?.compartmentIds ?? [])
+    .map((id) => fridge?.compartments.find((compartment) => compartment.id === id))
+    .filter((compartment): compartment is GuestCompartment => Boolean(compartment));
+  const selected =
+    behindDoor.find((compartment) => compartment.id === shownCompartmentId) ?? behindDoor[0] ?? null;
 
   const compartments = useMemo(
     () =>
@@ -147,8 +152,11 @@ export function GuestFridge() {
           <FridgeIllustration
             type={fridge.type}
             compartments={compartments}
-            selectedId={selectedId}
-            onSelect={(id) => setSelectedId((current) => (current === id ? null : id))}
+            selectedId={openPanel?.id ?? null}
+            onSelect={(panelId, compartmentIds) => {
+              setOpenPanel((current) => (current?.id === panelId ? null : { id: panelId, compartmentIds }));
+              setShownCompartmentId(compartmentIds[0] ?? null);
+            }}
           />
           <p className="text-center text-xs text-slate-500 dark:text-slate-400">
             Pick a door or drawer to see what is inside.
@@ -158,7 +166,13 @@ export function GuestFridge() {
         {selected ? (
           <GuestCompartmentPanel
             compartment={selected}
-            onClose={() => setSelectedId(null)}
+            siblings={behindDoor.map((compartment) => ({
+              id: compartment.id,
+              label: compartment.label,
+              itemCount: compartment.items.length,
+            }))}
+            onSelectSibling={setShownCompartmentId}
+            onClose={() => setOpenPanel(null)}
             onAdd={(item) => update(addGuestItem(fridge, selected.id, item))}
             onRemove={(itemId) => update(removeGuestItem(fridge, itemId))}
           />
@@ -281,7 +295,7 @@ export function GuestFridge() {
               type="button"
               onClick={() => {
                 update(null);
-                setSelectedId(null);
+                setOpenPanel(null);
                 setResults(null);
                 setResetting(false);
               }}
@@ -349,11 +363,15 @@ function GuestSearch({
 
 function GuestCompartmentPanel({
   compartment,
+  siblings,
+  onSelectSibling,
   onClose,
   onAdd,
   onRemove,
 }: {
   compartment: GuestCompartment;
+  siblings: { id: string; label: string; itemCount: number }[];
+  onSelectSibling: (compartmentId: string) => void;
   onClose: () => void;
   onAdd: (item: {
     ingredientName: string;
@@ -387,6 +405,29 @@ function GuestCompartmentPanel({
           </button>
         </span>
       </header>
+
+      {siblings.length > 1 ? (
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Storage behind this door">
+          {siblings.map((sibling) => {
+            const active = sibling.id === compartment.id;
+            return (
+              <button
+                key={sibling.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onSelectSibling(sibling.id)}
+                className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium ${
+                  active
+                    ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900'
+                    : 'border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800'
+                }`}
+              >
+                {sibling.label} <span className="opacity-70">{sibling.itemCount}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       <ul className="flex flex-col gap-2">
         {compartment.items.map((item) => {

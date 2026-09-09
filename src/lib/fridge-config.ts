@@ -12,25 +12,25 @@ export const FRIDGE_TYPES = [
   {
     type: FridgeType.french_door,
     label: 'French door',
-    description: 'Two doors up top, drawers below.',
+    description: 'Two doors over a full-width freezer drawer.',
     configurable: true,
   },
   {
     type: FridgeType.top_freezer,
     label: 'Top freezer',
-    description: 'Freezer above, fridge below.',
+    description: 'Small freezer above one tall fridge door.',
     configurable: false,
   },
   {
     type: FridgeType.bottom_freezer,
     label: 'Bottom freezer',
-    description: 'Fridge above, freezer drawer below.',
+    description: 'One tall fridge door over a freezer drawer.',
     configurable: false,
   },
   {
     type: FridgeType.side_by_side,
     label: 'Side by side',
-    description: 'Freezer and fridge in full-height halves.',
+    description: 'Two full-height doors, narrower freezer.',
     configurable: false,
   },
 ] as const;
@@ -86,6 +86,8 @@ export function generateCompartments(
     case FridgeType.french_door: {
       compartments.push({ type: CompartmentType.fridge_main, label: 'Fridge' });
       compartments.push({ type: CompartmentType.fridge_door, label: 'Door shelves' });
+      // Behind the doors, like the humidity crispers on a real French door.
+      compartments.push({ type: CompartmentType.crisper_drawer, label: 'Crisper drawer' });
       const middle = config.middleDrawers ?? 0;
       for (let i = 1; i <= middle; i += 1) {
         compartments.push({
@@ -121,6 +123,7 @@ export function generateCompartments(
       compartments.push({ type: CompartmentType.freezer_door, label: 'Freezer door' });
       compartments.push({ type: CompartmentType.fridge_main, label: 'Fridge' });
       compartments.push({ type: CompartmentType.fridge_door, label: 'Door shelves' });
+      compartments.push({ type: CompartmentType.crisper_drawer, label: 'Crisper drawer' });
       break;
     }
   }

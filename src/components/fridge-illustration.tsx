@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, useReducedMotion } from 'framer-motion';
-import { compartmentOpensAs, fridgeLayout, hingeFor, isFreezerCompartment } from '@/lib/fridge-layout';
+import { fridgePanels, isFreezerPanel } from '@/lib/fridge-layout';
 import type { LayoutCompartment } from '@/lib/fridge-layout';
 import type { ExpiryStatus } from '@/lib/expiry';
 import type { FridgeType } from '@/generated/prisma/enums';
@@ -16,8 +16,9 @@ export type IllustratedCompartment = LayoutCompartment & {
 type Props = {
   type: FridgeType;
   compartments: IllustratedCompartment[];
+  /** The open panel, i.e. a physical door or drawer. */
   selectedId?: string | null;
-  onSelect?: (compartmentId: string) => void;
+  onSelect?: (panelId: string, compartmentIds: string[]) => void;
   /** Non-interactive mode for the config builder's live preview. */
   preview?: boolean;
 };
@@ -43,33 +44,35 @@ const TILT_OPEN = 24;
  */
 const PAN_OPEN = 21;
 
+const SEVERITY: Record<ExpiryStatus, number> = { none: 0, fresh: 1, soon: 2, expired: 3 };
+
 /**
  * The fridge, in three dimensions: the cabinet is a real box in CSS 3D, doors
- * swing out on their hinge and drawers travel towards the viewer, and the light
- * inside comes on when something is open.
+ * swing out on their own hinge and drawers travel towards the viewer, and the
+ * light inside comes on when something is open.
  */
 export function FridgeIllustration({ type, compartments, selectedId, onSelect, preview }: Props) {
-  const columns = fridgeLayout(type, compartments);
+  const columns = fridgePanels(type, compartments);
   const reduceMotion = useReducedMotion();
   const interactive = Boolean(onSelect) && !preview;
 
-  // Which way the open compartment faces, so the cabinet can turn towards it
-  // and the swing stays in front of the body rather than behind it.
-  const openHinge = (() => {
-    if (!selectedId) return null;
-    for (const [columnIndex, column] of columns.entries()) {
-      for (const cell of column.cells) {
-        const indexInCell = cell.compartments.findIndex((entry) => entry.id === selectedId);
-        if (indexInCell === -1) continue;
-        if (compartmentOpensAs(type, cell.compartments[indexInCell]!.type) !== 'door') return null;
-        return hingeFor(indexInCell, cell.compartments.length, columnIndex, columns.length);
-      }
-    }
-    return null;
-  })();
+  const openPanel = columns
+    .flatMap((column) => column.panels)
+    .find((entry) => entry.id === selectedId);
 
   const bodyTilt =
-    openHinge === 'left' ? TILT_OPEN : openHinge === 'right' ? -TILT_OPEN : BASE_TILT;
+    openPanel && openPanel.opens === 'door'
+      ? openPanel.hinge === 'left'
+        ? TILT_OPEN
+        : -TILT_OPEN
+      : BASE_TILT;
+
+  const pan =
+    openPanel && openPanel.opens === 'door'
+      ? openPanel.hinge === 'left'
+        ? `${PAN_OPEN}%`
+        : `-${PAN_OPEN}%`
+      : 0;
 
   return (
     <div
@@ -92,13 +95,7 @@ export function FridgeIllustration({ type, compartments, selectedId, onSelect, p
         role={preview ? 'img' : 'group'}
         aria-label={preview ? 'Preview of your fridge layout' : 'Your fridge'}
         animate={
-          preview
-            ? { rotateX: 0, rotateY: 0, x: 0 }
-            : {
-                rotateX: 3,
-                rotateY: bodyTilt,
-                x: openHinge === 'left' ? `${PAN_OPEN}%` : openHinge === 'right' ? `-${PAN_OPEN}%` : 0,
-              }
+          preview ? { rotateX: 0, rotateY: 0, x: 0 } : { rotateX: 3, rotateY: bodyTilt, x: pan }
         }
         transition={reduceMotion ? { duration: 0 } : BODY_SPRING}
       >
@@ -107,55 +104,57 @@ export function FridgeIllustration({ type, compartments, selectedId, onSelect, p
 
         <div className="fridge-cabinet">
           {columns.map((column, columnIndex) => (
-            <div
-              key={columnIndex}
-              className="fridge-column"
-              style={{ flexGrow: column.grow }}
-            >
-              {column.cells.map((cell, cellIndex) => (
-                <div key={cellIndex} className="fridge-band" style={{ flexGrow: cell.grow }}>
-                  {cell.compartments.map((compartment, indexInCell) => {
-                    const open = selectedId === compartment.id;
-                    const opens = compartmentOpensAs(type, compartment.type);
-                    const hinge = hingeFor(
-                      indexInCell,
-                      cell.compartments.length,
-                      columnIndex,
-                      columns.length,
+            <div key={columnIndex} className="fridge-column" style={{ flexGrow: column.grow }}>
+              {/* Panels in the same band sit side by side: a French-door pair. */}
+              {groupIntoBands(column.panels).map((band, bandIndex) => (
+                <div
+                  key={bandIndex}
+                  className="fridge-band"
+                  style={{ flexGrow: band[0]!.grow }}
+                >
+                  {band.map((entry) => {
+                    const open = selectedId === entry.id;
+                    const contents = entry.compartments.flatMap(
+                      (compartment) => compartment.itemLabels ?? [],
                     );
-                    const expiry = compartment.worstExpiry ?? 'none';
+                    const itemCount = entry.compartments.reduce(
+                      (total, compartment) => total + (compartment.itemCount ?? 0),
+                      0,
+                    );
+                    const countsKnown = entry.compartments.some(
+                      (compartment) => compartment.itemCount !== undefined,
+                    );
+                    const expiry = entry.compartments.reduce<ExpiryStatus>(
+                      (worst, compartment) =>
+                        SEVERITY[compartment.worstExpiry ?? 'none'] > SEVERITY[worst]
+                          ? (compartment.worstExpiry ?? 'none')
+                          : worst,
+                      'none',
+                    );
                     const flagged = expiry === 'soon' || expiry === 'expired';
 
-                    // rotateY(+θ) sends an element's right edge away from the
-                    // viewer, so a left-hinged door opens on a negative angle
-                    // and a right-hinged one on a positive angle.
                     const panelMotion =
-                      opens === 'door'
+                      entry.opens === 'door'
                         ? {
-                            rotateY: open ? (hinge === 'left' ? -DOOR_ANGLE : DOOR_ANGLE) : 0,
+                            // rotateY(+θ) sends an element's right edge away
+                            // from the viewer, so a left-hinged door opens on a
+                            // negative angle.
+                            rotateY: open ? (entry.hinge === 'left' ? -DOOR_ANGLE : DOOR_ANGLE) : 0,
                           }
-                        : {
-                            // A drawer comes out and dips very slightly.
-                            z: open ? 62 : 0,
-                            y: open ? 6 : 0,
-                          };
+                        : { z: open ? 62 : 0, y: open ? 6 : 0 };
 
                     return (
                       <div
-                        key={compartment.id}
+                        key={entry.id}
                         className="fridge-cell"
                         data-open={open}
-                        data-freezer={isFreezerCompartment(compartment.type)}
+                        data-freezer={isFreezerPanel(entry)}
                       >
                         <div className="fridge-interior" aria-hidden={!open}>
-                          {open && opens === 'door' && compartment.itemLabels ? (
+                          {open && entry.opens === 'door' ? (
                             <div className="fridge-chips">
-                              {compartment.itemLabels.slice(0, 12).map((item) => (
-                                <span
-                                  key={item.id}
-                                  className="fridge-chip"
-                                  data-expiry={item.expiry}
-                                >
+                              {contents.slice(0, 12).map((item) => (
+                                <span key={item.id} className="fridge-chip" data-expiry={item.expiry}>
                                   {item.label}
                                 </span>
                               ))}
@@ -175,8 +174,13 @@ export function FridgeIllustration({ type, compartments, selectedId, onSelect, p
                             disabled={!open}
                             aria-hidden={!open}
                             tabIndex={open ? 0 : -1}
-                            onClick={() => onSelect?.(compartment.id)}
-                            aria-label={`Close ${compartment.label}`}
+                            onClick={() =>
+                              onSelect?.(
+                                entry.id,
+                                entry.compartments.map((compartment) => compartment.id),
+                              )
+                            }
+                            aria-label={`Close ${entry.label}`}
                           >
                             <span className="fridge-close-pill">Close</span>
                           </button>
@@ -185,11 +189,11 @@ export function FridgeIllustration({ type, compartments, selectedId, onSelect, p
                         <motion.button
                           type="button"
                           className={`fridge-panel${interactive ? '' : ' fridge-panel--static'}`}
-                          data-opens={opens}
+                          data-opens={entry.opens}
                           style={{
                             transformOrigin:
-                              opens === 'door'
-                                ? hinge === 'left'
+                              entry.opens === 'door'
+                                ? entry.hinge === 'left'
                                   ? 'left center'
                                   : 'right center'
                                 : 'center bottom',
@@ -199,26 +203,34 @@ export function FridgeIllustration({ type, compartments, selectedId, onSelect, p
                           aria-expanded={interactive ? open : undefined}
                           aria-label={
                             interactive
-                              ? `${compartment.label}${
-                                  compartment.itemCount === undefined
-                                    ? ''
-                                    : `, ${compartment.itemCount} item${compartment.itemCount === 1 ? '' : 's'}`
-                                }${flagged ? `, ${expiry === 'expired' ? 'has expired items' : 'has items expiring soon'}` : ''}`
+                              ? `${entry.label}${countsKnown ? `, ${itemCount} item${itemCount === 1 ? '' : 's'}` : ''}${
+                                  flagged
+                                    ? `, ${expiry === 'expired' ? 'has expired items' : 'has items expiring soon'}`
+                                    : ''
+                                }`
                               : undefined
                           }
-                          onClick={interactive ? () => onSelect?.(compartment.id) : undefined}
+                          onClick={
+                            interactive
+                              ? () =>
+                                  onSelect?.(
+                                    entry.id,
+                                    entry.compartments.map((compartment) => compartment.id),
+                                  )
+                              : undefined
+                          }
                           animate={panelMotion}
                           transition={
                             reduceMotion
                               ? { duration: 0 }
-                              : opens === 'door'
+                              : entry.opens === 'door'
                                 ? DOOR_SPRING
                                 : DRAWER_SPRING
                           }
                           whileHover={
                             interactive && !open && !reduceMotion
-                              ? opens === 'door'
-                                ? { rotateY: hinge === 'left' ? -7 : 7 }
+                              ? entry.opens === 'door'
+                                ? { rotateY: entry.hinge === 'left' ? -7 : 7 }
                                 : { z: 10 }
                               : undefined
                           }
@@ -240,14 +252,14 @@ export function FridgeIllustration({ type, compartments, selectedId, onSelect, p
                           {/* The handle is part of the door's shape, so it
                               travels with it. */}
                           <span
-                            className={`fridge-handle fridge-handle--${opens}`}
-                            data-hinge={hinge}
+                            className={`fridge-handle fridge-handle--${entry.opens}`}
+                            data-hinge={entry.hinge}
                             aria-hidden
                           />
 
-                          {open && opens === 'drawer' && compartment.itemLabels?.length ? (
+                          {open && entry.opens === 'drawer' && contents.length > 0 ? (
                             <span className="fridge-tray">
-                              {compartment.itemLabels.slice(0, 8).map((item) => (
+                              {contents.slice(0, 8).map((item) => (
                                 <span key={item.id} className="fridge-chip" data-expiry={item.expiry}>
                                   {item.label}
                                 </span>
@@ -255,14 +267,14 @@ export function FridgeIllustration({ type, compartments, selectedId, onSelect, p
                             </span>
                           ) : null}
 
-                          {open && opens === 'drawer' ? null : (
-                            <span className="fridge-label">{compartment.label}</span>
+                          {open && entry.opens === 'drawer' ? null : (
+                            <span className="fridge-label">{entry.label}</span>
                           )}
-                          {compartment.itemCount === undefined || (open && opens === 'drawer') ? null : (
+                          {!countsKnown || (open && entry.opens === 'drawer') ? null : (
                             <span className="fridge-sublabel">
-                              {compartment.itemCount === 0
+                              {itemCount === 0
                                 ? 'Empty'
-                                : `${compartment.itemCount} item${compartment.itemCount === 1 ? '' : 's'}`}
+                                : `${itemCount} item${itemCount === 1 ? '' : 's'}`}
                             </span>
                           )}
                         </motion.button>
@@ -277,4 +289,27 @@ export function FridgeIllustration({ type, compartments, selectedId, onSelect, p
       </motion.div>
     </div>
   );
+}
+
+/**
+ * Consecutive panels of the same height and matching hinges form one band, so
+ * a French-door pair renders side by side while everything else stacks.
+ */
+function groupIntoBands<T extends { grow: number; hinge: string; opens: string }>(
+  panels: T[],
+): T[][] {
+  const bands: T[][] = [];
+  for (const entry of panels) {
+    const last = bands[bands.length - 1];
+    const pairable =
+      last?.length === 1 &&
+      last[0]!.grow === entry.grow &&
+      last[0]!.opens === 'door' &&
+      entry.opens === 'door' &&
+      last[0]!.hinge === 'left' &&
+      entry.hinge === 'right';
+    if (pairable) last.push(entry);
+    else bands.push([entry]);
+  }
+  return bands;
 }

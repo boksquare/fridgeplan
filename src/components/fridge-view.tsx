@@ -17,8 +17,21 @@ export function FridgeView({ fridge, otherFridges }: {
   otherFridges: { id: string; name: string }[];
 }) {
   const router = useRouter();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = fridge.compartments.find((compartment) => compartment.id === selectedId) ?? null;
+  // The open door or drawer, and which of the compartments behind it is being
+  // shown — a fridge door covers the shelves, its bins and the crisper.
+  const [openPanel, setOpenPanel] = useState<{ id: string; compartmentIds: string[] } | null>(null);
+  const [shownCompartmentId, setShownCompartmentId] = useState<string | null>(null);
+
+  const behindDoor = (openPanel?.compartmentIds ?? [])
+    .map((id) => fridge.compartments.find((compartment) => compartment.id === id))
+    .filter((compartment): compartment is ClientFridge['compartments'][number] => Boolean(compartment));
+  const selected =
+    behindDoor.find((compartment) => compartment.id === shownCompartmentId) ?? behindDoor[0] ?? null;
+
+  function togglePanel(panelId: string, compartmentIds: string[]) {
+    setOpenPanel((current) => (current?.id === panelId ? null : { id: panelId, compartmentIds }));
+    setShownCompartmentId(compartmentIds[0] ?? null);
+  }
 
   const compartments = fridge.compartments.map((compartment) => ({
     id: compartment.id,
@@ -68,8 +81,8 @@ export function FridgeView({ fridge, otherFridges }: {
           <FridgeIllustration
             type={fridge.type}
             compartments={compartments}
-            selectedId={selectedId}
-            onSelect={(id) => setSelectedId((current) => (current === id ? null : id))}
+            selectedId={openPanel?.id ?? null}
+            onSelect={togglePanel}
           />
           <p className="text-center text-xs text-slate-500 dark:text-slate-400">
             Pick a door or drawer to see what is inside.
@@ -95,7 +108,13 @@ export function FridgeView({ fridge, otherFridges }: {
           <CompartmentPanel
             compartment={selected}
             onChanged={() => router.refresh()}
-            onClose={() => setSelectedId(null)}
+            onClose={() => setOpenPanel(null)}
+            siblings={behindDoor.map((compartment) => ({
+              id: compartment.id,
+              label: compartment.label,
+              itemCount: compartment.items.length,
+            }))}
+            onSelectSibling={setShownCompartmentId}
           />
         ) : (
           <p className="text-sm text-slate-600 dark:text-slate-400">

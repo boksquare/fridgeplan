@@ -44,7 +44,14 @@ with real side and top faces, doors that swing out on their own hinge with
 spring physics, drawers that travel towards you, the light coming on inside,
 and your items shown on the shelves and in the drawer trays. Handles meet in
 the middle the way they do on a French-door or side-by-side unit, and the
-cabinet turns towards whichever door you open so you can see in. It respects
+cabinet turns towards whichever door you open so you can see in.
+
+Panels are the doors and drawers the appliance actually has, which is not the
+same as its storage locations: door bins and crisper drawers sit *behind* a
+door, so opening one offers the storage behind it rather than pretending each
+is a door of its own. Proportions come from the capacity split of a common
+model of each type — see `src/lib/fridge-layout.ts` for the models and
+numbers. It respects
 `prefers-reduced-motion`, works by keyboard, and fits a 390px screen without
 horizontal scroll. Hosted instances also get browser-only guest mode.
 

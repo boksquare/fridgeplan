@@ -17,10 +17,15 @@ export function CompartmentPanel({
   compartment,
   onChanged,
   onClose,
+  siblings,
+  onSelectSibling,
 }: {
   compartment: ClientCompartment;
   onChanged: () => void;
   onClose?: () => void;
+  /** The other storage behind the same door, e.g. shelves and door bins. */
+  siblings?: { id: string; label: string; itemCount: number }[];
+  onSelectSibling?: (compartmentId: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -76,6 +81,33 @@ export function CompartmentPanel({
           ) : null}
         </span>
       </header>
+
+      {siblings && siblings.length > 1 && onSelectSibling ? (
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Storage behind this door">
+          {siblings.map((sibling) => {
+            const active = sibling.id === compartment.id;
+            return (
+              <button
+                key={sibling.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onSelectSibling(sibling.id)}
+                className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium ${
+                  active
+                    ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900'
+                    : 'border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800'
+                }`}
+              >
+                {sibling.label}
+                <span className={active ? 'opacity-70' : 'text-slate-500 dark:text-slate-400'}>
+                  {' '}
+                  {sibling.itemCount}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
