@@ -47,6 +47,7 @@ model Household {
 
   members HouseholdMember[]
   fridges Fridge[]
+  recipes Recipe[]
 }
 
 enum HouseholdRole {
@@ -194,7 +195,12 @@ model Recipe {
   ingredients  Json    @default("[]")
   instructions String  @default("")
   isPrivate    Boolean @default(false)
+  // Creator of a private recipe.
   ownerUserId  String?
+  // Private recipes are shared with the creator's household: every member can
+  // see and edit them. Null when the creator has no household, which keeps
+  // personal self-host instances working unchanged.
+  householdId  String?
   // Spoonacular's terms permit caching for at most 1 hour, so rows sourced
   // from it carry an expiry and are never treated as a permanent mirror.
   // TheMealDB rows leave this null and are cached indefinitely with attribution.
@@ -202,10 +208,12 @@ model Recipe {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  owner User? @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  owner     User?      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  household Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
   @@unique([sourceApi, externalId])
   @@index([ownerUserId])
+  @@index([householdId])
   @@index([cacheExpiresAt])
 }
 

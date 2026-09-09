@@ -10,6 +10,15 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env — generate with: openssl rand -base64 32}
       AUTH_TRUST_HOST: "true"
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      UPLOAD_DIR: /app/uploads
+      # Optional: recipe sources and the AI provider. See .env.example.
+      SPOONACULAR_API_KEY: ${SPOONACULAR_API_KEY:-}
+      RECIPE_PROVIDERS: ${RECIPE_PROVIDERS:-}
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_ENCRYPTION_KEY: ${AI_ENCRYPTION_KEY:-}
     ports:
       - "${APP_PORT:-3000}:3000"
     volumes:

@@ -29,10 +29,18 @@ Replacing a fridge asks what should happen to the inventory inside: move it
 across (matching compartment where there is one, main fridge or freezer section
 otherwise), or delete it — the latter behind two further confirmations.
 
-**Phase 2** brings recipes (suggest/search, missing ingredients, substitutions,
-cook-confirmation decrement, private recipes) and the AI provider abstraction;
-**Phase 3** is the full visual and animation pass. Recipe buttons appear on the
-fridge page once you have inventory, disabled until then.
+**Phase 2 (recipes and AI)** — "Suggest meals" matches every fridge you can
+reach against the configured recipe sources; "Search recipes" does free-text and
+cuisine search over the same sources. Both show what you have and what you are
+missing, and can ask the configured AI provider for substitutions — preferring
+things already in your fridges. "Mark as cooked" asks you to confirm what was
+actually used before decrementing inventory, and never guesses when units do not
+reconcile. You can add your own recipes with an optional photo; those are
+private to your household. Recipe sources and AI providers are both swappable
+adapters behind one interface.
+
+**Phase 3** is the full visual and animation pass, expiry-flag polish, guest
+mode for hosted instances, and the self-host docs.
 
 ## Stack
 
@@ -98,6 +106,28 @@ A few things worth knowing:
   standalone build. A non-Docker deploy is a plain `npm run build && npm start`.
 - Auth.js needs `AUTH_TRUST_HOST=true` whenever the app runs behind a proxy or
   in a container.
+
+## Recipes and AI
+
+Recipe sources are adapters behind one interface (`src/lib/recipes/`), so a
+self-hoster can point the app at their own provider:
+
+| Source | Key | Caching |
+| --- | --- | --- |
+| TheMealDB | none | stored indefinitely, with attribution |
+| Spoonacular | yours, optional | pass-through only — rows expire after 1 hour |
+
+Spoonacular's terms allow caching for at most an hour and require deleting
+everything obtained from them if you stop using the API. Rows from it carry an
+expiry that is swept on every search, and `npm run purge:provider spoonacular`
+removes the lot.
+
+AI providers work the same way (`src/lib/ai/`): NVIDIA NIM, Google Gemini, any
+OpenAI-compatible endpoint, the Anthropic API, and — on personal self-host
+instances only — the `claude` CLI already signed in on the host. On a hosted
+instance the operator sets the provider in config and it is locked for users,
+who see which one is answering; on self-host the user picks it in
+Settings → AI provider. Stored keys are encrypted at rest.
 
 ## Data model
 

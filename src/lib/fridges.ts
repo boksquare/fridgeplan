@@ -68,6 +68,13 @@ export async function createFridgeForUser(input: {
   });
 }
 
+/** Items across every fridge the user can reach — what recipe matching sees. */
+export async function countAccessibleItems(userId: string) {
+  return prisma.inventoryItem.count({
+    where: { consumedAt: null, compartment: { fridge: fridgeAccessFilter(userId) } },
+  });
+}
+
 /** Items still in a fridge, so a delete confirmation can say what is at stake. */
 export async function countItemsInFridge(fridgeId: string) {
   return prisma.inventoryItem.count({

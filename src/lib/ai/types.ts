@@ -1,0 +1,40 @@
+export type AIRequest = {
+  system: string;
+  prompt: string;
+  /** Upper bound on the reply; adapters map this to their own parameter. */
+  maxTokens?: number;
+};
+
+export type AIResponse = { text: string; model: string };
+
+/**
+ * One interface for every AI backend. Adding a provider means adding an
+ * adapter — calling code (substitutions today, more later) never changes.
+ */
+export type AIProvider = {
+  id: string;
+  label: string;
+  /** Self-host only: not offered on a public hosted instance. */
+  selfHostOnly?: boolean;
+  /** False when the adapter talks to something local rather than an API. */
+  needsApiKey: boolean;
+  defaultModel: string;
+  chat(request: AIRequest, config: AIProviderRuntimeConfig): Promise<AIResponse>;
+};
+
+export type AIProviderRuntimeConfig = {
+  apiKey?: string;
+  model?: string;
+  /** OpenAI-compatible endpoints and self-hosted gateways. */
+  baseUrl?: string;
+};
+
+export class AIProviderError extends Error {
+  constructor(
+    public providerId: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'AIProviderError';
+  }
+}
