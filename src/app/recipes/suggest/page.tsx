@@ -37,6 +37,7 @@ export default async function SuggestPage() {
 
       <RecipeSummaryList
         recipes={results}
+        backTo="/recipes/suggest"
         emptyMessage={
           inventoryCount === 0
             ? 'Add something to a fridge first and suggestions will appear here.'

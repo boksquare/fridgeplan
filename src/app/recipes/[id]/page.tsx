@@ -7,12 +7,20 @@ import { prisma } from '@/lib/prisma';
 import { CookPanel, type CookCandidate } from '@/components/cook-panel';
 import { SubstitutionPanel } from '@/components/substitution-panel';
 import { ProviderNote } from '@/components/provider-note';
+import { recipeBackLink } from '@/lib/recipes/back-link';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RecipePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   const user = await requireUserPage();
   const { id } = await params;
+  const back = recipeBackLink((await searchParams).from);
 
   const found = await getRecipeWithMatch(user.id, id);
   if (!found) notFound();
@@ -42,10 +50,10 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
     <main className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6">
       <header className="flex flex-col gap-3">
         <Link
-          href="/recipes"
+          href={back.href}
           className="w-fit text-sm text-slate-600 underline decoration-dotted hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
         >
-          ← All recipes
+          ← {back.label}
         </Link>
         <h1 className="text-3xl font-semibold tracking-tight">{recipe.title}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -95,6 +103,18 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
                   missing
                 </span>
               )}
+              {/* Something close is in the fridge but is not the same thing, so
+                  it is named rather than counted — you decide whether chicken
+                  nuggets stand in for chicken. */}
+              {!entry.have && entry.possible.length > 0 ? (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  you do have{' '}
+                  {entry.possible
+                    .slice(0, 2)
+                    .map((option) => option.ingredientName)
+                    .join(' and ')}
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>

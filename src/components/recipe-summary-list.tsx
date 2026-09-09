@@ -1,13 +1,21 @@
 import Link from 'next/link';
 import type { RecipeSummary } from '@/lib/recipes/service';
+import { backParam } from '@/lib/recipes/back-link';
 
 /** Shared result list for suggest and search: what you have, what you don't. */
 export function RecipeSummaryList({
   recipes,
   emptyMessage,
+  /**
+   * This list's own path (with query), so a recipe opened from here can offer a
+   * link back to it. Without it the recipe page can only send the user to the
+   * index, which throws away the results they were reading.
+   */
+  backTo,
 }: {
   recipes: RecipeSummary[];
   emptyMessage: string;
+  backTo?: string;
 }) {
   if (recipes.length === 0) {
     return <p className="text-sm text-slate-600 dark:text-slate-400">{emptyMessage}</p>;
@@ -20,7 +28,10 @@ export function RecipeSummaryList({
           key={recipe.id}
           className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
         >
-          <Link href={`/recipes/${recipe.id}`} className="flex h-full flex-col">
+          <Link
+            href={backTo ? `/recipes/${recipe.id}?${backParam(backTo)}` : `/recipes/${recipe.id}`}
+            className="flex h-full flex-col"
+          >
             {recipe.imageUrl ? (
               // Source photos come from allow-listed hosts; uploads are served
               // by our own route. A plain img keeps both paths simple.
