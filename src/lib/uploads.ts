@@ -54,7 +54,9 @@ export async function deleteUpload(url: string) {
  * that climbs out of it.
  */
 export function resolveUploadPath(relative: string): string | null {
-  const resolved = path.resolve(UPLOAD_DIR, relative);
-  const root = path.resolve(UPLOAD_DIR);
+  // turbopackIgnore keeps the bundler from tracing the whole project into the
+  // server output because this path comes from configuration.
+  const resolved = path.resolve(/* turbopackIgnore: true */ UPLOAD_DIR, relative);
+  const root = path.resolve(/* turbopackIgnore: true */ UPLOAD_DIR);
   return resolved === root || resolved.startsWith(`${root}${path.sep}`) ? resolved : null;
 }

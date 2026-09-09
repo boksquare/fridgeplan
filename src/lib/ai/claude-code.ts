@@ -35,7 +35,11 @@ export const claudeCodeProvider: AIProvider = {
     if (config.model && config.model !== 'default') args.push('--model', config.model);
 
     const output = await new Promise<string>((resolve, reject) => {
-      const child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      // turbopackIgnore: the binary is configuration, not a project file, and
+      // tracing it would pull the whole project into the server bundle.
+      const child = spawn(/* turbopackIgnore: true */ binary, args, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
       let stdout = '';
       let stderr = '';
       const timer = setTimeout(() => {

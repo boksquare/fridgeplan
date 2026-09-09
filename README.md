@@ -194,6 +194,16 @@ migrations before the app starts serving:
 git pull && docker compose up --build -d
 ```
 
+**The production build must not need a database.** `next build` evaluates every
+route module to collect its config, and the Docker build has no Postgres — so
+`src/lib/prisma.ts` connects on first *use* rather than on import. Anything that
+opens a connection at module scope will break `docker compose build` while
+passing locally, where `.env` happens to supply `DATABASE_URL`. Check with:
+
+```bash
+env -u DATABASE_URL npm run build
+```
+
 **Secrets.** `AUTH_SECRET` signs sessions and, unless `AI_ENCRYPTION_KEY` is
 set, also derives the key that encrypts stored AI provider keys. Changing it
 signs everyone out and makes stored provider keys unreadable, so set it once
