@@ -67,10 +67,10 @@ export default async function HomePage({
           Your recipes
         </Link>
         <Link
-          href="/settings/ai"
+          href="/settings"
           className="text-sm text-slate-600 underline decoration-dotted hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
         >
-          AI provider
+          Settings
         </Link>
       </section>
     </main>

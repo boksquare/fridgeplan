@@ -144,6 +144,29 @@ browser data clears the fridge, and there is no server-side copy to recover.
 Cook-confirmation and AI substitutions need an account, since both depend on
 persistent state.
 
+## Entering inventory
+
+Typing an ingredient prefills the unit it is usually bought in — "ground beef"
+becomes lb, "olive oil" becomes tbsp. The sources are tried cheapest first:
+
+1. **What you last used** for that ingredient, which beats every general rule.
+2. **What was cached** on the ingredient row from an earlier lookup.
+3. **A curated table** (`src/lib/units/table.ts`) covering common groceries,
+   with keyword fallbacks so "organic ground turkey" still finds lb.
+4. **The AI provider**, only for an ingredient already in the dictionary whose
+   unit nothing else knows — then cached on that row, so an unknown ingredient
+   costs one call ever rather than one per keystroke. Guests never reach this
+   step, so a hosted instance does not spend its operator's quota on anonymous
+   traffic.
+5. `count`, the old default.
+
+A suggestion only fills a unit you have not set yourself: pick one by hand and
+it stops overriding you. Which system it leans towards is per-user, under
+Settings, and defaults to imperial.
+
+Note the gap: the unit list has no gallon, pint or fluid ounce, so imperial
+liquids land on `cup`.
+
 ## Recipes and AI
 
 Recipe sources are adapters behind one interface (`src/lib/recipes/`), so a

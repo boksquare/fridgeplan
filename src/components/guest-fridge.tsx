@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { Unit } from '@/generated/prisma/enums';
 import { expiryStatus, expiryLabel } from '@/lib/expiry';
@@ -386,7 +386,36 @@ function GuestCompartmentPanel({
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState<Unit>(Unit.count);
+  const [unitTouched, setUnitTouched] = useState(false);
   const [expires, setExpires] = useState('');
+
+  // Guests get the curated part of the unit suggestion: no account means no
+  // history and no AI call, but the common cases still prefill.
+  const requestId = useRef(0);
+  useEffect(() => {
+    const trimmed = name.trim();
+    if (unitTouched || trimmed.length < 2) return;
+
+    const id = ++requestId.current;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/units/suggest?ingredient=${encodeURIComponent(trimmed)}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const body = (await res.json()) as { unit: Unit | null };
+        if (id === requestId.current && body.unit) setUnit(body.unit);
+      } catch {
+        // Aborted or offline: leave the unit alone.
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [name, unitTouched]);
 
   return (
     <section className="flex flex-col gap-4">
@@ -474,6 +503,7 @@ function GuestCompartmentPanel({
             setName('');
             setQuantity('1');
             setExpires('');
+            setUnitTouched(false);
             setAdding(false);
           }}
           className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
@@ -496,7 +526,10 @@ function GuestCompartmentPanel({
               <select
                 aria-label="Unit"
                 value={unit}
-                onChange={(event) => setUnit(event.target.value as Unit)}
+                onChange={(event) => {
+                  setUnit(event.target.value as Unit);
+                  setUnitTouched(true);
+                }}
                 className="rounded-lg border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
               >
                 {UNITS.map((entry) => (

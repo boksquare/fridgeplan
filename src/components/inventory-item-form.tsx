@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Unit } from '@/generated/prisma/enums';
 import { UNITS, toDateInputValue, type ClientItem } from '@/lib/serialize';
 import { IngredientAutocomplete } from '@/components/ingredient-autocomplete';
@@ -17,10 +17,45 @@ export function InventoryItemForm({ compartmentId, item, onDone, onCancel }: Pro
   const [ingredientName, setIngredientName] = useState(item?.ingredientName ?? '');
   const [quantity, setQuantity] = useState(item ? String(item.quantity) : '1');
   const [unit, setUnit] = useState<Unit>(item?.unit ?? Unit.count);
+  // Editing an existing item, or picking a unit by hand, stops the suggestion
+  // from overriding a deliberate choice.
+  const [unitTouched, setUnitTouched] = useState(Boolean(item));
+  const [suggestedFor, setSuggestedFor] = useState<string | null>(null);
   const [dateAdded, setDateAdded] = useState(item?.dateAdded ?? toDateInputValue(new Date()));
   const [expirationDate, setExpirationDate] = useState(item?.expirationDate ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Prefill the unit from the ingredient name: this user's own habit first,
+  // then a curated table, then — once per unknown ingredient — the AI provider.
+  const requestId = useRef(0);
+  useEffect(() => {
+    const name = ingredientName.trim();
+    if (unitTouched || name.length < 2) return;
+
+    const id = ++requestId.current;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/units/suggest?ingredient=${encodeURIComponent(name)}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const body = (await res.json()) as { unit: Unit | null; source: string | null };
+        // Ignore a reply that a later keystroke has already superseded.
+        if (id !== requestId.current || !body.unit) return;
+        setUnit(body.unit);
+        setSuggestedFor(body.source === 'fallback' ? null : name);
+      } catch {
+        // Aborted or offline: leave the unit alone.
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [ingredientName, unitTouched]);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -96,7 +131,11 @@ export function InventoryItemForm({ compartmentId, item, onDone, onCancel }: Pro
             // option's text into the control's accessible name.
             aria-label="Unit"
             value={unit}
-            onChange={(event) => setUnit(event.target.value as Unit)}
+            onChange={(event) => {
+              setUnit(event.target.value as Unit);
+              setUnitTouched(true);
+              setSuggestedFor(null);
+            }}
             className="rounded-lg border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
           >
             {UNITS.map((entry) => (
@@ -105,6 +144,11 @@ export function InventoryItemForm({ compartmentId, item, onDone, onCancel }: Pro
               </option>
             ))}
           </select>
+          {suggestedFor && suggestedFor === ingredientName.trim() ? (
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Suggested for {suggestedFor}
+            </span>
+          ) : null}
         </label>
       </div>
 

@@ -23,6 +23,8 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   name          String?
+  // Which measurement system unit suggestions lean towards.
+  unitSystem    UnitSystem @default(imperial)
   // Null for OAuth-only users. Auth.js OAuth data lives in `Account`, so
   // adding providers later needs no schema change.
   passwordHash  String?
@@ -132,6 +134,11 @@ model Compartment {
 // Inventory
 // ---------------------------------------------------------------------------
 
+enum UnitSystem {
+  imperial
+  metric
+}
+
 enum Unit {
   g
   kg
@@ -150,6 +157,13 @@ model Ingredient {
   name      String   @unique
   // Alternate names used for autocomplete and recipe-ingredient matching.
   aliases   String[] @default([])
+  // The unit this ingredient is usually bought in, per measurement system, so
+  // entry can prefill it. Filled from a curated table, or once from the AI
+  // provider for a name the table does not know — then cached here, so an
+  // unknown ingredient costs at most one call ever.
+  defaultUnitImperial Unit?
+  defaultUnitMetric   Unit?
+  defaultUnitSource   String?
   createdAt DateTime @default(now())
 
   inventoryItems InventoryItem[]
