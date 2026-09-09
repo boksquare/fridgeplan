@@ -11,7 +11,7 @@ import {
   shapeToRequest,
   type FridgeShape,
 } from '@/components/fridge-shape-picker';
-import { FridgeIllustration } from '@/components/fridge-illustration';
+import { Fridge3DIsland } from '@/components/fridge-3d-island';
 import { IngredientAutocomplete } from '@/components/ingredient-autocomplete';
 import { Dialog } from '@/components/dialog';
 import {
@@ -149,7 +149,7 @@ export function GuestFridge() {
     <div className="flex flex-col gap-8">
       <div className="grid gap-8 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         <div className="flex flex-col gap-3">
-          <FridgeIllustration
+          <Fridge3DIsland
             type={fridge.type}
             compartments={compartments}
             selectedId={openPanel?.id ?? null}
@@ -158,8 +158,8 @@ export function GuestFridge() {
               setShownCompartmentId(compartmentIds[0] ?? null);
             }}
           />
-          <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-            Pick a door or drawer to see what is inside.
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Click a door or drawer on the model, or use the buttons.
           </p>
         </div>
 

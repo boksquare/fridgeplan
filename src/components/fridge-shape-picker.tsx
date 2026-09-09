@@ -3,7 +3,8 @@
 import { useMemo } from 'react';
 import { FridgeType } from '@/generated/prisma/enums';
 import { DRAWER_LIMITS, FRIDGE_TYPES, defaultFridgeName, generateCompartments } from '@/lib/fridge-config';
-import { FridgeIllustration } from '@/components/fridge-illustration';
+import { FridgeThumbnail } from '@/components/fridge-thumbnail';
+import { Fridge3DIsland } from '@/components/fridge-3d-island';
 
 export type FridgeShape = {
   type: FridgeType | null;
@@ -77,13 +78,12 @@ export function FridgeShapePicker({
                 }`}
               >
                 <div className="pointer-events-none w-full">
-                  <FridgeIllustration
+                  <FridgeThumbnail
                     type={entry.type}
                     compartments={generateCompartments(entry.type, {}).map((compartment) => ({
                       ...compartment,
                       id: `${entry.type}-${compartment.position}`,
                     }))}
-                    preview
                   />
                 </div>
                 <span className="flex flex-col gap-0.5">
@@ -147,7 +147,10 @@ export function FridgeShapePicker({
 
             <div className="flex flex-col gap-2">
               <p className="text-sm font-medium">Preview</p>
-              <FridgeIllustration type={value.type} compartments={previewCompartments} preview />
+              {/* The real model for the fridge being configured. The four type
+                  cards above stay lightweight drawings: browsers cap how many
+                  WebGL contexts one page may hold. */}
+              <Fridge3DIsland type={value.type} compartments={previewCompartments} preview />
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {previewCompartments.length} compartments will be created.
               </p>

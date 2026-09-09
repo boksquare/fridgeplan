@@ -245,3 +245,34 @@ export function isFreezerPanel<T extends LayoutCompartment>(panelToCheck: Fridge
     panelToCheck.compartments.every((compartment) => isFreezerCompartment(compartment.type))
   );
 }
+
+/**
+ * Consecutive panels of the same height with opposing hinges form one band, so
+ * a French-door pair sits side by side across the cabinet while everything else
+ * stacks.
+ */
+export function groupIntoBands<T extends { grow: number; hinge: Hinge; opens: OpenStyle }>(
+  panels: T[],
+): T[][] {
+  const bands: T[][] = [];
+  for (const entry of panels) {
+    const last = bands[bands.length - 1];
+    const pairable =
+      last?.length === 1 &&
+      last[0]!.grow === entry.grow &&
+      last[0]!.opens === 'door' &&
+      entry.opens === 'door' &&
+      last[0]!.hinge === 'left' &&
+      entry.hinge === 'right';
+    if (pairable) last.push(entry);
+    else bands.push([entry]);
+  }
+  return bands;
+}
+
+/** Short label for a panel, for the type thumbnails. */
+export function compartmentOpensAsLabel<T extends LayoutCompartment>(
+  panel: FridgePanel<T>,
+): string {
+  return panel.label.replace(' door', '').replace(' drawer', '');
+}

@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "./fridge.css";
 
 @theme {
   --color-fridge-shell: #eef1f4;
