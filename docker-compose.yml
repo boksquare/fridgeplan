@@ -23,7 +23,14 @@ services:
       # scalar ambiguous and stops the whole file parsing.
       AUTH_SECRET: "${AUTH_SECRET:?set AUTH_SECRET in .env - generate one with `openssl rand -base64 32`}"
       AUTH_TRUST_HOST: "true"
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      # Empty by default, and that is the right default: AUTH_TRUST_HOST above
+      # makes Auth.js take the origin from the incoming request, which is
+      # correct behind any proxy. This used to default to http://localhost:3000,
+      # which is a real URL for nobody but a local developer — and Auth.js
+      # resolves its redirects against it, so signing out sent everyone to a
+      # host that did not exist for them. Set it only if the app cannot see its
+      # own public host in the request headers.
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-}
       UPLOAD_DIR: /app/uploads
       # Optional: recipe sources and the AI provider. See .env.example.
       SPOONACULAR_API_KEY: ${SPOONACULAR_API_KEY:-}
