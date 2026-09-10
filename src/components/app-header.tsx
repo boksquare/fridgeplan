@@ -21,8 +21,10 @@ export async function AppHeader() {
   // bar pointing at pages they cannot open would only mislead.
   if (!mode || !user) return null;
 
+  // The bar is translucent so the drifting colour behind carries through
+  // instead of being cut off by an opaque band; the blur keeps text legible.
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 backdrop-blur-md dark:border-slate-800/70 dark:bg-slate-950/80">
+    <header className="sticky top-0 z-30 border-b border-slate-200/60 bg-white/65 backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-950/60">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <span

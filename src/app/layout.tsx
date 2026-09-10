@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AppHeader } from '@/components/app-header';
+import { AmbientBackground } from '@/components/ambient-background';
 
 /**
  * The header reads the deployment mode and the session, so every route under
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen">
+        <AmbientBackground />
         <AppHeader />
         {children}
       </body>

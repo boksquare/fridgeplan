@@ -122,12 +122,13 @@ export function Fridge3D({ type, compartments, selectedId, onSelect, preview }: 
 
   return (
     <div className="flex flex-col gap-3">
-      {/* A soft pool of light under the appliance rather than a filled panel:
-          a rectangle with edges made the model look pasted onto a card instead
-          of standing in the room the page background suggests. */}
+      {/* A soft pool under the appliance rather than a filled panel: a
+          rectangle with edges made the model look pasted onto a card. Kept
+          faint, because the page behind now supplies the colour and a heavier
+          grey wash here only desaturates it. */}
       <div
         ref={wrapperRef}
-        className="relative w-full [background:radial-gradient(60%_50%_at_50%_58%,rgba(148,163,184,0.22),transparent_70%)] dark:[background:radial-gradient(60%_50%_at_50%_58%,rgba(148,163,184,0.16),transparent_70%)]"
+        className="relative w-full [background:radial-gradient(52%_42%_at_50%_66%,rgba(100,116,139,0.12),transparent_72%)] dark:[background:radial-gradient(56%_46%_at_50%_62%,rgba(148,163,184,0.13),transparent_72%)]"
       >
         <canvas
           ref={canvasRef}

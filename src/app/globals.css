@@ -10,29 +10,141 @@
 
 :root {
   color-scheme: light dark;
+
+  /*
+   * The ambient palette. Two cold hues for the appliance and one warm for the
+   * food: a single blue wash was the reason the page read as flat, so the warm
+   * field is what actually earns its place here.
+   */
+  --ambient-cold: 56 189 248;   /* sky */
+  --ambient-deep: 129 140 248;  /* indigo */
+  --ambient-warm: 251 191 36;   /* amber */
+  --ambient-strength: 0.28;
+  --ambient-warm-strength: 0.18;
 }
 
-/*
- * The page behind the fridge.
- *
- * A flat fill left the appliance floating on a large empty rectangle. These two
- * soft radial pools sit roughly where the fridge stands, so the room falls away
- * towards the edges and the model reads as lit rather than pasted on. They are
- * fixed rather than scrolled: it is the room, not part of the content.
- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ambient-cold: 34 211 238;
+    --ambient-deep: 99 102 241;
+    --ambient-warm: 245 158 11;
+    /* The same alpha over near-black reads far weaker than over near-white. */
+    --ambient-strength: 0.26;
+    --ambient-warm-strength: 0.15;
+  }
+}
+
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
-  background-image:
-    radial-gradient(60rem 40rem at 50% -10%, rgba(56, 189, 248, 0.16), transparent 60%),
-    radial-gradient(50rem 40rem at 85% 15%, rgba(129, 140, 248, 0.12), transparent 55%);
-  background-attachment: fixed;
 }
 
 @media (prefers-color-scheme: dark) {
   body {
     @apply bg-slate-950 text-slate-100;
-    background-image:
-      radial-gradient(60rem 40rem at 50% -10%, rgba(56, 189, 248, 0.13), transparent 60%),
-      radial-gradient(50rem 40rem at 85% 15%, rgba(99, 102, 241, 0.12), transparent 55%);
+  }
+}
+
+/* --- the drifting background ---------------------------------------------- */
+
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  /* The fields drift beyond the viewport; without this they would lengthen the
+     page and put a scrollbar on every screen. */
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ambient-blob {
+  position: absolute;
+  display: block;
+  /* Oversized and centred on their own origin, so a drift of a few vw never
+     exposes an edge. */
+  width: 85vmax;
+  height: 85vmax;
+  border-radius: 50%;
+  /* A gradient that fades to nothing is its own blur, and costs a fraction of
+     what a filter on an element this size would. */
+  will-change: transform;
+}
+
+.ambient-blob-a {
+  top: -32vmax;
+  left: -18vmax;
+  background: radial-gradient(
+    closest-side,
+    rgb(var(--ambient-cold) / var(--ambient-strength)),
+    transparent 70%
+  );
+  animation: ambient-drift-a 38s ease-in-out infinite;
+}
+
+.ambient-blob-b {
+  top: -20vmax;
+  right: -24vmax;
+  background: radial-gradient(
+    closest-side,
+    rgb(var(--ambient-deep) / var(--ambient-strength)),
+    transparent 70%
+  );
+  animation: ambient-drift-b 47s ease-in-out infinite;
+}
+
+.ambient-blob-c {
+  bottom: -34vmax;
+  left: 22vmax;
+  background: radial-gradient(
+    closest-side,
+    rgb(var(--ambient-warm) / var(--ambient-warm-strength)),
+    transparent 70%
+  );
+  animation: ambient-drift-c 59s ease-in-out infinite;
+}
+
+/*
+ * Deliberately mismatched periods (38s, 47s, 59s — all coprime-ish) so the three
+ * never fall back into step and the motion never looks like a loop.
+ */
+@keyframes ambient-drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(7vw, 5vh, 0) scale(1.14);
+  }
+  66% {
+    transform: translate3d(-5vw, 8vh, 0) scale(0.94);
+  }
+}
+
+@keyframes ambient-drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.06);
+  }
+  40% {
+    transform: translate3d(-8vw, 7vh, 0) scale(0.92);
+  }
+  75% {
+    transform: translate3d(4vw, -4vh, 0) scale(1.16);
+  }
+}
+
+@keyframes ambient-drift-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(10vw, -7vh, 0) scale(1.2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-blob {
+    animation: none;
+    will-change: auto;
   }
 }

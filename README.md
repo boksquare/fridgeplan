@@ -39,6 +39,14 @@ reconcile. You can add your own recipes with an optional photo; those are
 private to your household. Recipe sources and AI providers are both swappable
 adapters behind one interface.
 
+The page behind it is three large colour fields drifting slowly — two cold for
+the appliance, one warm for the food, which is what keeps it from reading as a
+single blue wash. They are radial gradients that fade to transparent rather than
+blurred shapes, so there is no full-screen `filter: blur()` to repaint, and they
+move by `transform` alone, which the compositor handles without touching layout
+or paint. No JavaScript is involved. Anyone who has asked for reduced motion
+keeps the colour and loses the drift.
+
 **Phase 3 (the fridge itself)** — the appliance is drawn in CSS 3D: a cabinet
 with real side and top faces, doors that swing out on their own hinge with
 spring physics, drawers that travel towards you, the light coming on inside,
