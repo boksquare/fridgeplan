@@ -154,6 +154,12 @@ Then open http://localhost:3000 — an un-set-up instance redirects to `/setup`.
 Useful scripts: `npm run typecheck`, `npm run lint`, `npm run build`,
 `npm run prisma:generate`, `npm run prisma:deploy`.
 
+`npm run build:nodb` is the one to run before pushing. It builds with
+`DATABASE_URL` unset, which is the environment the Docker image builds in — a
+page that reads the database while being prerendered builds fine on a machine
+with a database in reach and fails only inside Docker. CI runs it too. (It sets
+an empty env var inline, so it wants a POSIX shell.)
+
 A few things worth knowing:
 
 - Prisma 7 keeps the connection URL in `prisma.config.ts`, not in

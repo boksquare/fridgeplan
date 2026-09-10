@@ -27,7 +27,7 @@ concurrency:
 jobs:
   # The image build runs `next build`, which type-checks — but not eslint, and a
   # failure there would only show up after `latest` had already moved. Gate on
-  # both before anything is pushed.
+  # lint, types and a database-less build before anything is pushed.
   check:
     runs-on: ubuntu-24.04
     steps:
@@ -42,6 +42,11 @@ jobs:
       - run: npx prisma generate
       - run: npm run lint
       - run: npm run typecheck
+      # The same build the image does, with no DATABASE_URL — because that is
+      # the environment the image builds in. A page that reads the database
+      # while being prerendered passes here with a database in reach and fails
+      # only inside Docker, which is a slow and confusing way to find out.
+      - run: npm run build:nodb
 
   # Each architecture is built on its own native runner and pushed by digest.
   # Building arm64 under QEMU on an amd64 runner works but takes the best part
