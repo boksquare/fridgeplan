@@ -1,3 +1,5 @@
+<!-- The same artwork as src/components/fridge-mark.tsx, which draws it
+     in the navbar. Change one and change the other. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="7" fill="#0f172a"/>
   <rect x="9" y="6" width="14" height="20" rx="2.5" fill="#e2e8f0"/>

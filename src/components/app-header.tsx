@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/current-user';
 import { getDeploymentMode } from '@/lib/deployment-mode';
 import { signOutAction } from '@/app/actions/auth';
 import { AccountMenu } from '@/components/account-menu';
+import { FridgeMark } from '@/components/fridge-mark';
 
 /**
  * The bar every signed-in page sits under.
@@ -27,16 +28,13 @@ export async function AppHeader() {
     <header className="sticky top-0 z-30 border-b border-slate-200/60 bg-white/65 backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-950/60">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <span
-            aria-hidden
-            className="grid size-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-sky-400 to-cyan-300 text-[13px] text-slate-900 shadow-sm"
-          >
-            F
-          </span>
-          {/* The wordmark is the first thing to go on a narrow screen: the mark
-              still links home, and the nav and account button both have to fit
-              at 390px without the row scrolling sideways. */}
-          <span className="hidden sm:inline">Fridgeplan</span>
+          <FridgeMark className="size-7 shrink-0 rounded-[7px] shadow-sm ring-1 ring-white/10" />
+          {/* The wordmark is the first thing to go on a narrow screen, where the
+              nav and the account button both have to fit at 390px without the
+              row scrolling sideways. It stays in the accessibility tree at every
+              width, because the mark beside it is decorative and this is the
+              only thing naming the link home. */}
+          <span className="sr-only sm:not-sr-only">Fridgeplan</span>
         </Link>
 
         <nav className="ml-auto flex items-center gap-0.5 text-sm sm:gap-1">
