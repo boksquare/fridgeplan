@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { requireUserPage } from '@/lib/page-guards';
+import { getDeploymentMode } from '@/lib/deployment-mode';
+import { getHouseholdFor } from '@/lib/households';
 import { UnitSystemForm } from '@/components/unit-system-form';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +9,10 @@ export const metadata = { title: 'Settings — Fridgeplan' };
 
 export default async function SettingsPage() {
   const user = await requireUserPage();
+  // Sharing needs accounts, so the section is absent on a personal instance
+  // rather than present and unusable.
+  const hosted = (await getDeploymentMode()) === 'public_hosted';
+  const household = hosted ? await getHouseholdFor(user.id) : null;
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6">
@@ -24,6 +30,23 @@ export default async function SettingsPage() {
         <h2 className="text-lg font-semibold">Measurements</h2>
         <UnitSystemForm current={user.unitSystem} />
       </section>
+
+      {hosted ? (
+        <section className="flex flex-col gap-3 border-t border-slate-200 pt-6 dark:border-slate-800">
+          <h2 className="text-lg font-semibold">Household</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            {household
+              ? `You share fridges with ${household.members.length - 1} other ${household.members.length === 2 ? 'person' : 'people'} in ${household.name}.`
+              : 'Share your fridges with the people you live with, so everyone sees the same contents.'}
+          </p>
+          <Link
+            href="/settings/household"
+            className="w-fit rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+          >
+            {household ? 'Manage household' : 'Set up a household'}
+          </Link>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-3 border-t border-slate-200 pt-6 dark:border-slate-800">
         <h2 className="text-lg font-semibold">AI provider</h2>

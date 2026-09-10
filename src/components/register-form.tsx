@@ -1,11 +1,15 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 export function RegisterForm() {
   const router = useRouter();
+  // Same-site paths only: this value comes from the URL, and following an
+  // absolute one would hand a freshly signed-in user to another origin.
+  const raw = useSearchParams().get('callbackUrl');
+  const callbackUrl = !raw || !raw.startsWith('/') || raw.startsWith('//') ? '/' : raw;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +33,7 @@ export function RegisterForm() {
     }
 
     await signIn('credentials', { email, password, redirect: false });
-    router.replace('/');
+    router.replace(callbackUrl);
     router.refresh();
   }
 

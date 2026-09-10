@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireUserPage } from '@/lib/page-guards';
 import { countAccessibleItems, getFridgeForUser, listFridges } from '@/lib/fridges';
@@ -29,50 +28,14 @@ export default async function HomePage({
   const totalItems = await countAccessibleItems(user.id);
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6">
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <FridgeView
         fridge={serializeFridge(fridge)}
         otherFridges={fridges
           .filter((entry) => entry.id !== fridge.id)
           .map((entry) => ({ id: entry.id, name: entry.name }))}
+        totalItems={totalItems}
       />
-
-      <section className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-6 dark:border-slate-800">
-        {/* Recipe entry points appear beneath the fridge once there is anything
-            in it to cook with. */}
-        {totalItems > 0 ? (
-          <>
-            <Link
-              href="/recipes/suggest"
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900"
-            >
-              Suggest recipes
-            </Link>
-            <Link
-              href="/recipes/search"
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-            >
-              Search recipes
-            </Link>
-          </>
-        ) : (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Add something to a compartment and recipe suggestions appear here.
-          </p>
-        )}
-        <Link
-          href="/recipes"
-          className="text-sm text-slate-600 underline decoration-dotted hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-        >
-          Your recipes
-        </Link>
-        <Link
-          href="/settings"
-          className="text-sm text-slate-600 underline decoration-dotted hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-        >
-          Settings
-        </Link>
-      </section>
     </main>
   );
 }

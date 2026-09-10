@@ -1,11 +1,23 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
+
+/**
+ * Only a same-site path is followed after signing in. `callbackUrl` comes from
+ * the URL, so an absolute one would turn this form into an open redirect that
+ * lands a just-authenticated user on someone else's page.
+ */
+function safeCallback(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
+}
 
 export function SignInForm() {
   const router = useRouter();
+  const params = useSearchParams();
+  const callbackUrl = safeCallback(params.get('callbackUrl'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +33,7 @@ export function SignInForm() {
       setSubmitting(false);
       return;
     }
-    router.replace('/');
+    router.replace(callbackUrl);
     router.refresh();
   }
 
@@ -60,7 +72,10 @@ export function SignInForm() {
       </button>
 
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        <a href="/register" className="underline">
+        <a
+          href={`/register?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+          className="underline"
+        >
           Create an account
         </a>{' '}
         or{' '}

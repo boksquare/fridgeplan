@@ -20,8 +20,8 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id            String     @id @default(cuid())
+  email         String     @unique
   name          String?
   // Which measurement system unit suggestions lean towards.
   unitSystem    UnitSystem @default(imperial)
@@ -30,8 +30,8 @@ model User {
   passwordHash  String?
   emailVerified DateTime?
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   accounts          Account[]
   sessions          Session[]
@@ -39,6 +39,8 @@ model User {
   fridges           Fridge[]
   recipes           Recipe[]
   aiProviderConfigs AIProviderConfig[]
+  invitesSent       HouseholdInvite[]  @relation("InvitesSent")
+  invitesAccepted   HouseholdInvite[]  @relation("InvitesAccepted")
 }
 
 model Household {
@@ -50,6 +52,7 @@ model Household {
   members HouseholdMember[]
   fridges Fridge[]
   recipes Recipe[]
+  invites HouseholdInvite[]
 }
 
 enum HouseholdRole {
@@ -68,6 +71,35 @@ model HouseholdMember {
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
   @@unique([userId, householdId])
+  @@index([householdId])
+}
+
+/// An invitation to join a household, redeemed through an unguessable link.
+///
+/// A link rather than an email because the app sends no mail: there is no SMTP
+/// to configure and nothing to fail silently. You generate a link and pass it
+/// on however you already talk to the person.
+///
+/// Single-use and time-limited, so a link that ends up somewhere it should not
+/// stops working: it is a bearer token, and anyone holding it can read and
+/// change everything in the household's fridges.
+model HouseholdInvite {
+  id           String    @id @default(cuid())
+  householdId  String
+  /// Random and unguessable; the whole security of the link rests on it.
+  code         String    @unique
+  createdById  String
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+  /// Set when the sender cancels it before use.
+  revokedAt    DateTime?
+  acceptedAt   DateTime?
+  acceptedById String?
+
+  household  Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy  User      @relation("InvitesSent", fields: [createdById], references: [id], onDelete: Cascade)
+  acceptedBy User?     @relation("InvitesAccepted", fields: [acceptedById], references: [id], onDelete: SetNull)
+
   @@index([householdId])
 }
 
@@ -158,10 +190,10 @@ enum Unit {
 }
 
 model Ingredient {
-  id        String   @id @default(cuid())
-  name      String   @unique
+  id                  String   @id @default(cuid())
+  name                String   @unique
   // Alternate names used for autocomplete and recipe-ingredient matching.
-  aliases   String[] @default([])
+  aliases             String[] @default([])
   // The unit this ingredient is usually bought in, per measurement system, so
   // entry can prefill it. Filled from a curated table, or once from the AI
   // provider for a name the table does not know — then cached here, so an
@@ -169,7 +201,7 @@ model Ingredient {
   defaultUnitImperial Unit?
   defaultUnitMetric   Unit?
   defaultUnitSource   String?
-  createdAt DateTime @default(now())
+  createdAt           DateTime @default(now())
 
   inventoryItems InventoryItem[]
 }
@@ -203,29 +235,29 @@ model InventoryItem {
 // ---------------------------------------------------------------------------
 
 model Recipe {
-  id           String  @id @default(cuid())
+  id             String    @id @default(cuid())
   // Which provider this came from ("themealdb", "spoonacular", "user").
-  sourceApi    String
-  externalId   String?
-  title        String
-  cuisine      String?
-  imageUrl     String?
+  sourceApi      String
+  externalId     String?
+  title          String
+  cuisine        String?
+  imageUrl       String?
   // [{ name, quantity, unit, raw }] — normalized at import time.
-  ingredients  Json    @default("[]")
-  instructions String  @default("")
-  isPrivate    Boolean @default(false)
+  ingredients    Json      @default("[]")
+  instructions   String    @default("")
+  isPrivate      Boolean   @default(false)
   // Creator of a private recipe.
-  ownerUserId  String?
+  ownerUserId    String?
   // Private recipes are shared with the creator's household: every member can
   // see and edit them. Null when the creator has no household, which keeps
   // personal self-host instances working unchanged.
-  householdId  String?
+  householdId    String?
   // Spoonacular's terms permit caching for at most 1 hour, so rows sourced
   // from it carry an expiry and are never treated as a permanent mirror.
   // TheMealDB rows leave this null and are cached indefinitely with attribution.
   cacheExpiresAt DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   owner     User?      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   household Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
@@ -246,19 +278,19 @@ enum AIProviderScope {
 }
 
 model AIProviderConfig {
-  id             String          @id @default(cuid())
-  scope          AIProviderScope
+  id              String          @id @default(cuid())
+  scope           AIProviderScope
   // Null for instance scope.
-  userId         String?
+  userId          String?
   // "nvidia_nim" | "gemini" | "openai_compatible" | "anthropic" | "claude_code"
-  provider       String
+  provider        String
   apiKeyEncrypted String?
-  model          String?
+  model           String?
   // Extra provider-specific settings (base URL for OpenAI-compatible, etc.).
-  settings       Json            @default("{}")
-  isActive       Boolean         @default(false)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  settings        Json            @default("{}")
+  isActive        Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -273,10 +305,10 @@ enum DeploymentModeKind {
 
 // Singleton: exactly one row, id = "singleton", written by first-run setup.
 model DeploymentMode {
-  id         String             @id @default("singleton")
-  mode       DeploymentModeKind
-  setupAt    DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  id        String             @id @default("singleton")
+  mode      DeploymentModeKind
+  setupAt   DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 }
 
 // ---------------------------------------------------------------------------

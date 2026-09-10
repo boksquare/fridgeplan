@@ -12,12 +12,27 @@
   color-scheme: light dark;
 }
 
+/*
+ * The page behind the fridge.
+ *
+ * A flat fill left the appliance floating on a large empty rectangle. These two
+ * soft radial pools sit roughly where the fridge stands, so the room falls away
+ * towards the edges and the model reads as lit rather than pasted on. They are
+ * fixed rather than scrolled: it is the room, not part of the content.
+ */
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
+  background-image:
+    radial-gradient(60rem 40rem at 50% -10%, rgba(56, 189, 248, 0.16), transparent 60%),
+    radial-gradient(50rem 40rem at 85% 15%, rgba(129, 140, 248, 0.12), transparent 55%);
+  background-attachment: fixed;
 }
 
 @media (prefers-color-scheme: dark) {
   body {
     @apply bg-slate-950 text-slate-100;
+    background-image:
+      radial-gradient(60rem 40rem at 50% -10%, rgba(56, 189, 248, 0.13), transparent 60%),
+      radial-gradient(50rem 40rem at 85% 15%, rgba(99, 102, 241, 0.12), transparent 55%);
   }
 }

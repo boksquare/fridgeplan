@@ -181,6 +181,26 @@ database — not in an env var.
 | AI provider | the user picks it in settings | the operator sets it in config; locked for users |
 | Claude Code adapter | available | refused |
 
+### Households (hosted only)
+
+A household is a group of people who manage the same fridges. A fridge belongs
+either to one user or to a household, so sharing is a matter of moving it: making
+a household moves the creator's fridges into it, and joining one brings the
+joiner's with them. The page says so before you press anything.
+
+Invitations are **unguessable links, not emails** — the app sends no mail, so
+there is no SMTP to configure and nothing to fail silently. That makes each link
+a bearer token: whoever opens it can read and change everything in the
+household's fridges. So a link works once, expires after seven days, and can be
+cancelled before it is used.
+
+Only an owner can invite, remove, or change roles. The last owner cannot leave or
+demote themselves while anyone else is still in, which would leave a household
+nobody could administer. The last member out takes the fridges with them and the
+household is dissolved.
+
+Settings → Household, or the account menu in the header.
+
 ### Guest mode (hosted only)
 
 A visitor without an account gets a fridge that lives entirely in their
