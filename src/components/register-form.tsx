@@ -11,6 +11,7 @@ export function RegisterForm() {
   const raw = useSearchParams().get('callbackUrl');
   const callbackUrl = !raw || !raw.startsWith('/') || raw.startsWith('//') ? '/' : raw;
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -23,7 +24,9 @@ export function RegisterForm() {
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      // The name is optional; send it only when given, since the API treats an
+      // empty string as a validation failure rather than as "no name".
+      body: JSON.stringify({ email, password, ...(name.trim() ? { name: name.trim() } : {}) }),
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -47,6 +50,20 @@ export function RegisterForm() {
           autoComplete="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium">
+          Name <span className="font-normal text-slate-500">(optional)</span>
+        </span>
+        <input
+          type="text"
+          autoComplete="name"
+          maxLength={80}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="What your household should call you"
           className="rounded-lg border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
         />
       </label>

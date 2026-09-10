@@ -205,6 +205,10 @@ demote themselves while anyone else is still in, which would leave a household
 nobody could administer. The last member out takes the fridges with them and the
 household is dissolved.
 
+Members show their display name, set at registration or later in Settings →
+Your name. It is optional, and everywhere a name appears falls back to the email
+address, so leaving it blank costs nothing but privacy in a shared list.
+
 Settings → Household, or the account menu in the header.
 
 ### Guest mode (hosted only)

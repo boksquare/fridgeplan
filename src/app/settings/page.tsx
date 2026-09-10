@@ -3,6 +3,7 @@ import { requireUserPage } from '@/lib/page-guards';
 import { getDeploymentMode } from '@/lib/deployment-mode';
 import { getHouseholdFor } from '@/lib/households';
 import { UnitSystemForm } from '@/components/unit-system-form';
+import { DisplayNameForm } from '@/components/display-name-form';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Settings — Fridgeplan' };
@@ -26,7 +27,15 @@ export default async function SettingsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       </header>
 
-      <section className="flex flex-col gap-3">
+      {/* Only meaningful where there is someone else to be a name to. */}
+      {hosted ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Your name</h2>
+          <DisplayNameForm current={user.name} email={user.email} />
+        </section>
+      ) : null}
+
+      <section className={`flex flex-col gap-3${hosted ? ' border-t border-slate-200 pt-6 dark:border-slate-800' : ''}`}>
         <h2 className="text-lg font-semibold">Measurements</h2>
         <UnitSystemForm current={user.unitSystem} />
       </section>
