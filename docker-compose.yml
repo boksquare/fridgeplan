@@ -1,13 +1,27 @@
+# Deploying pulls a prebuilt image rather than building on the box:
+#
+#   docker compose pull && docker compose up -d
+#
+# Images are published to GHCR by .github/workflows/publish.yml. To build from
+# your own working copy instead, add the build override:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+
 services:
   app:
-    build: .
+    # Override either half in .env: FRIDGEPLAN_IMAGE to run your own fork's
+    # image, FRIDGEPLAN_TAG to pin a release (e.g. v1.2.0) instead of tracking
+    # latest.
+    image: ${FRIDGEPLAN_IMAGE:-ghcr.io/boksquare/fridgeplan}:${FRIDGEPLAN_TAG:-latest}
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://fridgeplan:${POSTGRES_PASSWORD:-fridgeplan}@db:5432/fridgeplan?schema=public
-      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env — generate with: openssl rand -base64 32}
+      # Quoted: the ":?" message contains ": ", which makes an unquoted YAML
+      # scalar ambiguous and stops the whole file parsing.
+      AUTH_SECRET: "${AUTH_SECRET:?set AUTH_SECRET in .env - generate one with `openssl rand -base64 32`}"
       AUTH_TRUST_HOST: "true"
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       UPLOAD_DIR: /app/uploads

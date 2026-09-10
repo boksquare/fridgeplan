@@ -1,0 +1,12 @@
+# Build the app from this working copy instead of pulling the published image.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+#
+# For developing a change, and for anyone who would rather not run someone
+# else's binary. `image:` is still set by the base file, so the build is tagged
+# locally under the same name and a later `docker compose pull` replaces it.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile

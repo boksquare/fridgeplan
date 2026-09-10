@@ -63,15 +63,23 @@ horizontal scroll. Hosted instances also get browser-only guest mode.
 | Styling / animation | Tailwind CSS + Framer Motion |
 | Database | PostgreSQL via Prisma |
 | Auth | Auth.js (NextAuth) — email/password for v1, OAuth drop-in later |
-| Deployment | Dockerfile + docker-compose (app + postgres + uploads volume) |
+| Deployment | prebuilt multi-arch image on GHCR + docker-compose (app + postgres + uploads volume) |
 
 ## Run it with Docker
 
+Deploying pulls a prebuilt image from GitHub Container Registry. There is no
+clone and no build on the box:
+
 ```bash
-cp .env.example .env
+curl -O https://raw.githubusercontent.com/boksquare/fridgeplan/HEAD/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/boksquare/fridgeplan/HEAD/.env.example
 # set AUTH_SECRET (openssl rand -base64 32) and a POSTGRES_PASSWORD
-docker compose up --build
+docker compose up -d
 ```
+
+The image is public, so no `docker login` is needed. It is built for
+`linux/amd64` and `linux/arm64`, so the same tag works on a normal server, an
+Apple Silicon Mac and a Raspberry Pi.
 
 The app comes up on http://localhost:3000 and sends you to `/setup` to choose
 the deployment mode. Migrations are applied automatically on container start by
@@ -84,6 +92,46 @@ docker compose exec app npx prisma db seed
 
 (`tsx` and the Prisma CLI are runtime dependencies precisely so migrating and
 seeding work inside the container.)
+
+### Updating
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+The new container applies any migrations the release needs before it serves
+traffic. Note that this only goes forwards: rolling back to an older image does
+not undo a migration, so take a database dump first if you are updating
+something you cannot lose.
+
+By default you track `latest`, which moves with every push to the default
+branch. To decide for yourself when you move, pin a release in `.env`:
+
+```bash
+FRIDGEPLAN_TAG=v1.2.0
+```
+
+`FRIDGEPLAN_IMAGE` overrides the other half, for running a fork's image.
+
+### Building it yourself instead
+
+For developing a change, or for anyone who would rather not run someone else's
+binary:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+```
+
+### Publishing (maintainer)
+
+`.github/workflows/publish.yml` builds and pushes on every push to the default
+branch, and on any `v*` tag. `linux/amd64` and `linux/arm64` are each built on a
+native runner and then joined into one manifest, because building arm64 under
+emulation takes roughly an order of magnitude longer. It authenticates with the
+`GITHUB_TOKEN` Actions provides, so there is no secret to create or rotate.
+
+Tags published: `latest` (default branch only), `sha-<commit>` for every build,
+and `1.2.3` / `1.2` / `1` from a `v1.2.3` git tag.
 
 Reverse proxies, TLS termination and tunnels are deliberately out of scope here
 — compose publishes a plain HTTP port and any proxy in front of it is your

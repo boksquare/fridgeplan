@@ -1,0 +1,168 @@
+name: Publish image
+
+# Builds the app image and pushes it to GitHub Container Registry, so deploying
+# is `docker compose pull && docker compose up -d` rather than cloning the repo
+# and building on the box.
+#
+# Every push to the default branch republishes `latest`. Pushing a `v*` tag also
+# publishes the matching version tags, which is what to pin to if you would
+# rather decide when you move.
+
+on:
+  push:
+    # The default branch is what publishes `latest`. `main` is listed too so
+    # renaming the default branch later needs no change here.
+    branches:
+      - claude/new-session-vtl9zx
+      - main
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# One publish at a time per ref. A queued run is cancelled rather than racing
+# an older commit's image into `latest` after a newer one.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The image build runs `next build`, which type-checks — but not eslint, and a
+  # failure there would only show up after `latest` had already moved. Gate on
+  # both before anything is pushed.
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The Prisma client is generated source and is not committed, so nothing
+      # type-checks until it exists.
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npm run typecheck
+
+  # Each architecture is built on its own native runner and pushed by digest.
+  # Building arm64 under QEMU on an amd64 runner works but takes the best part
+  # of an hour for a Next.js build; ARM runners are free for public repos, so
+  # the two run side by side in minutes instead.
+  build:
+    needs: check
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare platform name
+        run: echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+        env:
+          platform: ${{ matrix.platform }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # Provided by Actions itself: no secret to create, nothing to rotate.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Only for the labels. The tags are decided in the merge job, but
+      # org.opencontainers.image.source has to be baked into the image itself:
+      # it is what links the GHCR package back to this repository, which is in
+      # turn what lets the package inherit the repo's visibility.
+      - name: Image labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          # No tag here. Each architecture is pushed as a bare digest and the
+          # merge job below names the manifest that ties them together, so a tag
+          # never briefly points at one architecture only.
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+
+      - name: Export the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          # The merge job reassembles "<registry>/<image>@sha256:<name>", so the
+          # file is named with the bare hex and the prefix is added back there.
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Work out the tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Create the multi-architecture manifest
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Show what was published
+        run: |
+          docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
