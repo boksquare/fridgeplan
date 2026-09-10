@@ -10,11 +10,7 @@ name: Publish image
 
 on:
   push:
-    # The default branch is what publishes `latest`. `main` is listed too so
-    # renaming the default branch later needs no change here.
-    branches:
-      - claude/new-session-vtl9zx
-      - main
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
