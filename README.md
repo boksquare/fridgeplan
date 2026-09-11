@@ -323,4 +323,4 @@ where an operator configures it, [Spoonacular](https://spoonacular.com/food-api)
 
 ## License
 
-TBD.
+[MIT](LICENSE).

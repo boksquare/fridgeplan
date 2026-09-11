@@ -136,6 +136,5 @@ terms**, `npm run purge:provider spoonacular` deletes it all).
 - Email or push notifications for expiry.
 - Admin panel for hosted operators to change the AI provider without editing config.
 - Automatic cross-family unit reconciliation at cook time (user confirms instead).
-- **`LICENSE` is still "TBD"** in the README — the user's call.
 - Suggested-but-not-requested AI ideas: shelf-life/expiry prefill, natural-language
   add, semantic ingredient matching, recipe-from-inventory, meal plan / shopping list.
