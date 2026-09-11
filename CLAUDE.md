@@ -10,10 +10,10 @@ already made: architecture invariants, domain choices, conventions, and the
 traps that have already cost a debugging cycle. **Read it before starting work**
 and follow what it settles rather than re-deciding it.
 
-It is **gitignored on purpose** — it is a scratchpad for this project's history,
-not documentation for people using the repo. That also means a fresh clone will
-not have it: if `context.md` is missing, say so and ask whether to reconstruct
-it before relying on memory.
+It is committed, so it comes with any clone and survives a cloud session that
+keeps nothing outside git. It is a working document for whoever is building
+this, not documentation for people *using* the app — that is `README.md`, and
+the two should not be allowed to blur into each other.
 
 ## Keep `context.md` up to date
 
