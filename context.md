@@ -26,7 +26,9 @@ Next.js 16 (App Router, Turbopack) · React 19.2 · TypeScript · Tailwind 4 ·
 Prisma 7 + Postgres · Auth.js v5 beta · three.js 0.186 · zod 4
 
 Constraints that are load-bearing — do not "fix" these:
-- **Plain three.js, not react-three-fiber.** R3F 9.x peer-pins React `<19.3`.
+- **Plain three.js, not react-three-fiber.** R3F was ruled out early over a
+  React peer-range conflict and has never been a dependency. The scene is
+  hand-written and works; do not migrate without a concrete reason.
 - **Prisma 7**: connection URL lives in `prisma.config.ts`, *not* `schema.prisma`;
   reaches Postgres via the `pg` driver adapter. Client is generated **source**
   into `src/generated/prisma` and is gitignored — run `npx prisma generate`
@@ -49,10 +51,27 @@ Constraints that are load-bearing — do not "fix" these:
 - **Nothing may read the database at build time.** See Traps.
 - **Compartments are generated** from a fridge's config JSON, not from presets.
   Door bins/crispers live *behind* a door (`src/lib/fridge-layout.ts`).
+- **The 3D scene** (`src/lib/fridge3d/scene.ts`) has four rules, each of which
+  was a user-visible bug once:
+  - The **camera never moves**. Do not rotate, tilt or pan the cabinet when a
+    door opens — this was explicitly rejected.
+  - `clearRoot()` must **dispose every geometry and material** it drops. Not
+    doing so leaked GPU memory on each rebuild.
+  - `openPanelId` is **restored after `setModel()`**, so adding an item does not
+    slam the open door shut.
+  - Item placement is seeded from `hashString(item.id)`, **never the array
+    index**, or contents reshuffle whenever anything changes.
 - **Guest mode is 100% client-side** (localStorage + `useSyncExternalStore`),
   stateless recipe proxy, zero DB writes. Guests get no AI.
 
 ## Domain decisions
+
+**Unit prefill** (`src/lib/units/suggest.ts`) — cheapest source first: what this
+user last used for that ingredient → the value cached on the ingredient row →
+the curated table (`src/lib/units/table.ts`) → the AI, once, then cached →
+`count`. It only fills a unit the user has not set themselves, and which system
+it leans towards is a per-user setting defaulting to imperial. Bulk callers pass
+`allowAI: false` so a 60-line receipt is not 60 calls.
 
 **Units** — three families in `src/lib/recipes/units.ts`: mass (g/kg/oz/lb),
 volume (ml/l/tsp/tbsp/floz/cup/pt/gal), `count`. Each unit knows its size in
@@ -67,19 +86,25 @@ Anything sharing only a word is `possible` — shown as a hint, never counted.
 The list is deliberately short: under-matching is visible and correctable,
 over-matching hides a shopping trip. Colours/varieties are excluded on purpose.
 
-**Households** — invite by unguessable link (no email; the app sends no mail).
-Single-use, 7-day expiry, revocable. Redemption uses a conditional `updateMany`
-so two people opening one link cannot both join. Only owners invite/remove/
+**Recipe list navigation** — a recipe opened from suggestions or search carries
+its origin in a `from` param (validated to a same-site recipe path, so it cannot
+become an open redirect) and offers a link back to it. Search terms live in the
+URL, not component state, so returning re-runs the search. Both lists are
+computed per request; dropping either would strand the user on an empty index.
+
+**Households** (`src/lib/households.ts`) — invite by unguessable link (no email;
+the app sends no mail). Single-use, 7-day expiry, revocable. Redemption claims
+the invite with a conditional `updateMany`, so two people opening the same link
+cannot both join. Only owners invite/remove/
 change roles; the last owner cannot leave or demote while others remain; the
 last member out takes the fridges and the household dissolves.
 
 **AI** — optional, three callsites only: substitutions
 (`src/lib/ai/substitutions.ts`), receipt scanning (`src/lib/receipts/scan.ts`),
-unit suggestions (`src/lib/units/suggest.ts`, cached per ingredient so an
-unknown name costs one call ever). Providers: `nvidia_nim`, `gemini`,
-`openai_compatible`, `anthropic`, `claude_code`. `claude_code` is self-host-only
-and **cannot** do vision. NIM needs a vision model for receipts. Keys encrypted
-at rest with `AI_ENCRYPTION_KEY` or `AUTH_SECRET`.
+unit suggestions (`src/lib/units/suggest.ts`, above). Providers: `nvidia_nim`,
+`gemini`, `openai_compatible`, `anthropic`, `claude_code`. `claude_code` is
+self-host-only and **cannot** do vision; NIM needs a vision model for receipts.
+Keys are encrypted at rest with `AI_ENCRYPTION_KEY`, or `AUTH_SECRET` if unset.
 
 **Receipt scanning** — the photo is never written to disk, stored, or logged.
 Always a reviewable draft with the printed line beside each reading. Shrunk
@@ -127,7 +152,11 @@ terms**, `npm run purge:provider spoonacular` deletes it all).
    `docker/entrypoint.sh`. Migrations only go forwards.
 7. **`AUTH_SECRET` is load-bearing** — changing it signs everyone out and makes
    stored AI keys unreadable.
-8. `normalizeIngredientName()` **strips descriptor words** ("ground", "fresh"),
+8. **Two pushes in quick succession cancel the first image build.** The publish
+   workflow sets `cancel-in-progress`, so an older commit cannot land on `latest`
+   after a newer one. A run showing "cancelled" is that, not a failure — and the
+   skipped commit never gets its own `sha-` tag.
+9. `normalizeIngredientName()` **strips descriptor words** ("ground", "fresh"),
    so it must not be used for exact-identity checks — `resolveIngredient()`
    matches the raw name case-insensitively.
 
@@ -136,5 +165,6 @@ terms**, `npm run purge:provider spoonacular` deletes it all).
 - Email or push notifications for expiry.
 - Admin panel for hosted operators to change the AI provider without editing config.
 - Automatic cross-family unit reconciliation at cook time (user confirms instead).
-- Suggested-but-not-requested AI ideas: shelf-life/expiry prefill, natural-language
-  add, semantic ingredient matching, recipe-from-inventory, meal plan / shopping list.
+- Suggested-but-not-requested AI ideas: shelf-life/expiry prefill,
+  natural-language add, semantic ingredient matching, recipe-from-inventory,
+  meal plan / shopping list.
