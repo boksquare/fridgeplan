@@ -94,9 +94,8 @@ terms**, `npm run purge:provider spoonacular` deletes it all).
 
 - **Comments explain *why*, not what** — especially the non-obvious constraint
   that forced a choice. Match surrounding density.
-- **Verify by running, not by assuming.** Real Postgres + Playwright/Chromium
-  headless (`--enable-unsafe-swiftshader` for WebGL). Never claim something
-  works because it compiled.
+- **Verify by running, not by assuming.** Real Postgres, and a headless browser
+  for anything with a UI. Never claim something works because it compiled.
 - **Commit messages**: imperative subject, body explains *why* and what was
   verified. End with the `Co-Authored-By:` / `Claude-Session:` lines the session
   provides.
@@ -131,19 +130,6 @@ terms**, `npm run purge:provider spoonacular` deletes it all).
 8. `normalizeIngredientName()` **strips descriptor words** ("ground", "fresh"),
    so it must not be used for exact-identity checks — `resolveIngredient()`
    matches the raw name case-insensitively.
-
-## This sandbox (Claude Code on the web)
-
-- **No outbound network** to most hosts (themealdb, the user's own domain).
-  Local stub server at `/tmp/claude-0/stub-apis.mjs` fakes TheMealDB /
-  Spoonacular / OpenAI-compatible shapes.
-- **No Docker daemon** — the image cannot be built or run here. Validate via
-  `docker compose config` and `npm run build:nodb`.
-- Postgres is local; `service postgresql start` if it is down. Test users:
-  `alice@/bob@/carol@example.com`, password `supersecret1`.
-- `pkill -f next-server` also kills backgrounded children — start the app with
-  `setsid nohup npm run start &`.
-- The container is **ephemeral**: nothing outside git survives the session.
 
 ## Open / not built
 
