@@ -11,3 +11,7 @@ next-env.d.ts
 
 # Prisma generates its client as source; regenerate with `npx prisma generate`.
 src/generated/
+
+# Working context for Claude Code. Deliberately local: it is a scratchpad of
+# decisions and traps, not documentation for users of this repo.
+context.md
